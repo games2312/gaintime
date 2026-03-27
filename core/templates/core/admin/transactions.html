@@ -1,0 +1,59 @@
+{% extends 'core/admin/admin_base.html' %}
+{% block title %}Gestion {{ type }} - Admin{% endblock %}
+
+{% block content %}
+<div class="mb-6 mt-4">
+    <a href="{% url 'admin_dashboard' %}" class="text-blue-600 text-xs mb-2 block"><i class="fas fa-arrow-left mr-1"></i> Retour Dashboard</a>
+    <h2 class="text-xl font-bold text-gray-800 uppercase">Gestion des {{ type }}</h2>
+</div>
+
+<div class="space-y-4">
+    {% for tx in transactions %}
+    <div class="bg-white rounded-2xl p-4 shadow-soft border {% if tx.status == 'PENDING' %}border-orange-200 bg-orange-50/20{% else %}border-gray-100{% endif %}">
+        <div class="flex justify-between items-start mb-3">
+            <div>
+                <p class="font-bold text-gray-800">{{ tx.user.username }}</p>
+                <p class="text-[10px] text-gray-500">{{ tx.created_at|date:"d M Y, H:i" }}</p>
+            </div>
+            <div class="text-right">
+                <p class="text-lg font-bold text-blue-600">{{ tx.amount|floatformat:0 }} F</p>
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase 
+                    {% if tx.status == 'PENDING' %}bg-orange-100 text-orange-600
+                    {% elif tx.status == 'COMPLETED' %}bg-green-100 text-green-600
+                    {% else %}bg-red-100 text-red-600{% endif %}">
+                    {{ tx.get_status_display }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="bg-gray-50 p-2 rounded-lg text-[11px] text-gray-600 mb-4">
+            <p><strong>Méthode:</strong> {{ tx.get_payment_method_display }}</p>
+            <p><strong>Note:</strong> {{ tx.description }}</p>
+            {% if tx.proof_image %}
+            <div class="mt-2">
+                <p class="font-bold mb-1">Preuve :</p>
+                <a href="{{ tx.proof_image.url }}" target="_blank">
+                    <img src="{{ tx.proof_image.url }}" class="w-full h-32 object-cover rounded-lg border border-gray-200">
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if tx.status == 'PENDING' %}
+        <div class="flex gap-2">
+            <a href="{% url 'admin_tx_update' tx.id 'approve' %}" class="flex-1 bg-green-600 text-white text-center py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-green-700 transition">
+                APPROUVER
+            </a>
+            <a href="{% url 'admin_tx_update' tx.id 'reject' %}" class="flex-1 bg-red-100 text-red-600 text-center py-2.5 rounded-xl text-xs font-bold hover:bg-red-200 transition">
+                REJETER
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div class="text-center py-20">
+        <p class="text-gray-400">Aucune transaction trouvée.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

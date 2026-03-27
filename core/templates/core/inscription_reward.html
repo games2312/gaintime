@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Créer un compte - GainTime</title>
+    <!-- Intégration de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Police pour une touche africaine moderne -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icônes Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            font-family: 'Poppins', sans-serif;
+        }
+        .hero-gradient {
+            background: linear-gradient(135deg, #1e3a8a 0%, #059669 100%);
+        }
+        .btn-primary {
+            background: linear-gradient(to right, #059669, #10b981);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(to right, #10b981, #34d399);
+        }
+        .input-focus:focus {
+            border-color: #059669;
+            box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+        }
+        .country-flag {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .input-with-icon {
+            padding-left: 45px;
+        }
+        .invitation-code-highlight {
+            background: linear-gradient(to right, #fef3c7, #fde68a);
+            border: 2px dashed #f59e0b;
+        }
+        .shadow-soft {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- En-tête principal -->
+    <header class="hero-gradient text-white py-6">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-center items-center">
+                <a href="{% url 'home' %}" class="flex items-center">
+                    <div class="bg-white text-green-600 font-bold text-2xl p-3 rounded-lg mr-3">
+                        GT
+                    </div>
+                    <span class="text-2xl font-bold">GainTime</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenu principal -->
+    <main class="flex-grow py-8 md:py-12">
+        <div class="container mx-auto px-4 max-w-md">
+            <!-- Carte d'inscription -->
+            <div class="bg-white rounded-2xl shadow-soft overflow-hidden">
+                <!-- En-tête de la carte -->
+                <div class="bg-gradient-to-r from-blue-50 to-green-50 p-6 text-center border-b">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Créer un compte</h1>
+                    <p class="text-gray-600">Rejoignez la communauté et commencez à gagner</p>
+                </div>
+
+                <!-- Zone de notification (pour les erreurs Django) -->
+                {% if messages %}
+                <div class="p-4">
+                    {% for message in messages %}
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-exclamation-circle text-red-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-red-700">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if form.errors %}
+                <div class="p-4">
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-exclamation-circle text-red-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-red-700 font-medium">Veuillez corriger les erreurs ci-dessous</p>
+                                <ul class="mt-2 text-sm text-red-700 list-disc list-inside">
+                                    {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                            <li>{{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Formulaire d'inscription -->
+                <form method="POST" action="{% url 'register' %}" class="p-6 space-y-6">
+                    {% csrf_token %}
+                    
+                    <!-- Champ Nom d'utilisateur -->
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user text-gray-400 mr-2"></i>Nom d'utilisateur
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user-circle text-gray-400"></i>
+                            </div>
+                            <input type="text" 
+                                   id="username" 
+                                   name="username" 
+                                   value="{{ form.username.value|default_if_none:'' }}"
+                                   required 
+                                   class="input-focus w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none"
+                                   placeholder="Ex: Wends23">
+                        </div>
+                        {% if form.username.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.username.errors.0 }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-xs text-gray-500">Ce nom sera visible par vos filleuls</p>
+                    </div>
+
+                    <!-- Champ Numéro de téléphone -->
+                    <div>
+                        <label for="phone_number" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-mobile-alt text-gray-400 mr-2"></i>Numéro Mobile (OM/MOMO)
+                        </label>
+                        <div class="relative">
+                            <div class="country-flag">
+                                <span class="text-xl">🇨🇲</span>
+                            </div>
+                            <input type="tel" 
+                                   id="phone_number" 
+                                   name="phone_number" 
+                                   value="{{ form.phone_number.value|default_if_none:'' }}"
+                                   required 
+                                   pattern="[0-9]{9}"
+                                   class="input-focus w-full input-with-icon pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none"
+                                   placeholder="6xxxxxxxx (9 chiffres)"
+                                   inputmode="numeric">
+                        </div>
+                        {% if form.phone_number.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.phone_number.errors.0 }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-xs text-gray-500">Utilisé pour les retraits Orange Money / MTN Mobile Money</p>
+                    </div>
+
+                    <!-- Champ Mot de passe -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-lock text-gray-400 mr-2"></i>Mot de passe
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-key text-gray-400"></i>
+                            </div>
+                            <input type="password" 
+                                   id="password" 
+                                   name="password" 
+                                   required 
+                                   class="input-focus w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none"
+                                   placeholder="Votre mot de passe sécurisé">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                <button type="button" onclick="togglePasswordVisibility('password', 'eye-icon-password')" class="text-gray-400 hover:text-gray-600">
+                                    <i id="eye-icon-password" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% if form.password.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.password.errors.0 }}</p>
+                        {% endif %}
+                        <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+                            <div class="flex items-center">
+                                <i id="length-check" class="fas fa-times text-red-500 mr-1"></i>
+                                <span>8 caractères minimum</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i id="number-check" class="fas fa-times text-red-500 mr-1"></i>
+                                <span>1 chiffre</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Champ Confirmation du mot de passe -->
+                    <div>
+                        <label for="confirm_password" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-lock text-gray-400 mr-2"></i>Confirmer le mot de passe
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-key text-gray-400"></i>
+                            </div>
+                            <input type="password" 
+                                   id="confirm_password" 
+                                   name="confirm_password" 
+                                   required 
+                                   class="input-focus w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none"
+                                   placeholder="Retapez votre mot de passe">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                <button type="button" onclick="togglePasswordVisibility('confirm_password', 'eye-icon-confirm')" class="text-gray-400 hover:text-gray-600">
+                                    <i id="eye-icon-confirm" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% if form.confirm_password.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.confirm_password.errors.0 }}</p>
+                        {% endif %}
+                        <div class="mt-2 flex items-center hidden" id="password-match">
+                            <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                            <span class="text-xs text-green-600">Les mots de passe correspondent</span>
+                        </div>
+                        <div class="mt-2 flex items-center hidden" id="password-mismatch">
+                            <i class="fas fa-times-circle text-red-500 mr-2"></i>
+                            <span class="text-xs text-red-600">Les mots de passe ne correspondent pas</span>
+                        </div>
+                    </div>
+
+                    <!-- Champ Code de parrainage (OBLIGATOIRE) -->
+                    <div class="pt-4 border-t">
+                        <div class="invitation-code-highlight p-4 rounded-lg mb-4">
+                            <div class="flex items-center mb-2">
+                                <i class="fas fa-user-friends text-orange-500 mr-2"></i>
+                                <label for="invitation_code_input" class="block text-sm font-bold text-gray-800">
+                                    Code de parrainage (OBLIGATOIRE)
+                                </label>
+                            </div>
+                            <p class="text-xs text-gray-700 mb-3">Un code d'invitation valide est requis pour créer votre compte. Demandez à un ami qui utilise déjà GainTime.</p>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-ticket-alt text-orange-400"></i>
+                                </div>
+                                <input type="text" 
+                                       id="invitation_code_input" 
+                                       name="invitation_code_input" 
+                                       value="{{ form.invitation_code_input.value|default_if_none:'' }}"
+                                       required 
+                                       class="input-focus w-full pl-10 pr-4 py-3 border border-orange-300 rounded-lg focus:outline-none focus:border-orange-500"
+                                       placeholder="Entrez le code ici">
+                            </div>
+                            {% if form.invitation_code_input.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.invitation_code_input.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Info sur le parrainage -->
+                        <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle text-blue-500"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-blue-700">
+                                        <span class="font-semibold">Pourquoi le code est obligatoire ?</span><br>
+                                        Le système de parrainage permet à votre parrain de gagner un bonus sur vos activités, et vous pourrez aussi gagner en parrainant d'autres personnes.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Conditions d'utilisation -->
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="terms" name="terms" type="checkbox" required class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="terms" class="text-gray-700">
+                                J'accepte les <a href="#" class="text-green-600 hover:text-green-800 font-medium">Conditions d'utilisation</a> et la <a href="#" class="text-green-600 hover:text-green-800 font-medium">Politique de confidentialité</a>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Bouton d'inscription -->
+                    <button type="submit" id="submit-btn" class="btn-primary w-full text-white font-bold py-4 px-4 rounded-lg text-lg hover:shadow-lg transition duration-300 flex items-center justify-center">
+                        <i class="fas fa-user-plus mr-2"></i> S'inscrire
+                    </button>
+
+                    <!-- Lien vers connexion -->
+                    <div class="text-center pt-4">
+                        <p class="text-gray-600">
+                            Déjà un compte ?
+                            <a href="{% url 'login' %}" class="text-green-600 hover:text-green-800 font-semibold">
+                                Se connecter
+                            </a>
+                        </p>
+                    </div>
+                </form>
+
+                <!-- Section d'aide -->
+                <div class="px-6 pb-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-bold text-gray-800 mb-2 flex items-center">
+                            <i class="fas fa-question-circle text-gray-400 mr-2"></i> Besoin d'aide ?
+                        </h3>
+                        <p class="text-sm text-gray-600">
+                            Si vous n'avez pas de code d'invitation, contactez notre équipe sur WhatsApp :
+                            <a href="https://wa.me/237653051272" class="text-green-600 font-semibold">+237 6 53 05 12 72</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Retour à l'accueil -->
+            <div class="text-center mt-6">
+                <a href="{% url 'home' %}" class="text-gray-600 hover:text-green-600 flex items-center justify-center">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour à l'accueil
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Pied de page simplifié -->
+    <footer class="bg-gray-900 text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="text-center">
+                <div class="flex justify-center items-center mb-4">
+                    <div class="bg-white text-green-600 font-bold text-lg p-2 rounded-lg mr-2">
+                        GT
+                    </div>
+                    <span class="text-lg font-bold">GainTime</span>
+                </div>
+                <div class="mb-6">
+                    <a href="#" class="text-gray-400 hover:text-white mx-3 text-sm">Conditions d'utilisation</a>
+                    <a href="#" class="text-gray-400 hover:text-white mx-3 text-sm">Politique de confidentialité</a>
+                    <a href="#" class="text-gray-400 hover:text-white mx-3 text-sm">Contact</a>
+                </div>
+                <div class="text-gray-500 text-sm">
+                    &copy; Copyright 2026 - GainTime. Tous droits réservés.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Fonction pour basculer la visibilité du mot de passe
+        function togglePasswordVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        // Validation en temps réel des mots de passe
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm_password');
+        const passwordMatch = document.getElementById('password-match');
+        const passwordMismatch = document.getElementById('password-mismatch');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        // Validation de la force du mot de passe
+        const lengthCheck = document.getElementById('length-check');
+        const numberCheck = document.getElementById('number-check');
+        
+        function validatePassword() {
+            const password = passwordInput.value;
+            
+            // Validation de la longueur
+            if (password.length >= 8) {
+                lengthCheck.classList.remove('fa-times', 'text-red-500');
+                lengthCheck.classList.add('fa-check', 'text-green-500');
+            } else {
+                lengthCheck.classList.remove('fa-check', 'text-green-500');
+                lengthCheck.classList.add('fa-times', 'text-red-500');
+            }
+            
+            // Validation des chiffres
+            if (/\d/.test(password)) {
+                numberCheck.classList.remove('fa-times', 'text-red-500');
+                numberCheck.classList.add('fa-check', 'text-green-500');
+            } else {
+                numberCheck.classList.remove('fa-check', 'text-green-500');
+                numberCheck.classList.add('fa-times', 'text-red-500');
+            }
+        }
+        
+        function checkPasswordMatch() {
+            if (passwordInput.value === '' && confirmPasswordInput.value === '') {
+                passwordMatch.classList.add('hidden');
+                passwordMismatch.classList.add('hidden');
+                return;
+            }
+            
+            if (passwordInput.value === confirmPasswordInput.value) {
+                passwordMatch.classList.remove('hidden');
+                passwordMismatch.classList.add('hidden');
+            } else {
+                passwordMatch.classList.add('hidden');
+                passwordMismatch.classList.remove('hidden');
+            }
+        }
+        
+        passwordInput.addEventListener('input', function() {
+            validatePassword();
+            checkPasswordMatch();
+        });
+        
+        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+        
+        // Validation initiale
+        validatePassword();
+        
+        // Validation du formulaire avant soumission
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            const terms = document.getElementById('terms').checked;
+            
+            // Vérification de la longueur du mot de passe
+            if (password.length < 8) {
+                e.preventDefault();
+                alert('Le mot de passe doit contenir au moins 8 caractères.');
+                passwordInput.focus();
+                return;
+            }
+            
+            // Vérification de la correspondance des mots de passe
+            if (password !== confirmPassword) {
+                e.preventDefault();
+                alert('Les mots de passe ne correspondent pas.');
+                confirmPasswordInput.focus();
+                return;
+            }
+            
+            // Vérification des conditions d'utilisation
+            if (!terms) {
+                e.preventDefault();
+                alert('Vous devez accepter les conditions d\'utilisation.');
+                return;
+            }
+            
+            // Si tout est valide, on peut activer une animation de chargement
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Création du compte...';
+            submitBtn.disabled = true;
+        });
+        
+        // Formatage du numéro de téléphone
+        const phoneInput = document.getElementById('phone_number');
+        phoneInput.addEventListener('input', function(e) {
+            // Ne garder que les chiffres
+            let value = e.target.value.replace(/\D/g, '');
+            
+            // Limiter à 9 chiffres
+            if (value.length > 9) {
+                value = value.substring(0, 9);
+            }
+            
+            // Mettre à jour la valeur
+            e.target.value = value;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Exécution Mission - GainTime{% endblock %}
+
+{% block content %}
+<div class="min-h-[70vh] flex flex-col items-center justify-center text-center p-6">
+    <div class="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border border-gray-100">
+        <div class="mb-6">
+            <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <i class="fas fa-hourglass-half text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-black text-gray-800">{{ task.title }}</h1>
+            <p class="text-gray-500 text-sm mt-2">{{ task.description }}</p>
+        </div>
+
+        <!-- Timer Circle -->
+        <div class="relative w-40 h-40 mx-auto mb-8">
+            <svg class="w-full h-full transform -rotate-90">
+                <circle cx="80" cy="80" r="70" stroke="currentColor" stroke-width="8" fill="transparent" class="text-gray-100" />
+                <circle id="progress-circle" cx="80" cy="80" r="70" stroke="currentColor" stroke-width="8" fill="transparent" 
+                    stroke-dasharray="440" stroke-dashoffset="0"
+                    class="text-blue-600 transition-all duration-1000 ease-linear" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <span id="timer-text" class="text-4xl font-black text-gray-800">{{ duration }}s</span>
+            </div>
+        </div>
+
+        <div id="action-area">
+            <p class="text-xs text-orange-600 font-bold mb-6 flex items-center justify-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i> Ne fermez pas cette page
+            </p>
+            
+            <a href="{{ task.link }}" target="_blank" class="block w-full bg-gray-800 text-white py-4 rounded-2xl font-bold hover:bg-black transition-all shadow-lg active:scale-95 mb-4">
+                Ouvrir le lien de la mission
+            </a>
+        </div>
+
+        <form id="claim-form" method="POST" action="{% url 'claim_auto_task' task.id %}" class="hidden">
+            {% csrf_token %}
+            <button type="submit" class="w-full bg-green-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-green-600 transition-all shadow-xl shadow-green-100 animate-bounce">
+                RÉCUPÉRER MON GAIN
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    let timeLeft = {{ duration }};
+    const totalTime = {{ duration }};
+    const timerText = document.getElementById('timer-text');
+    const progressCircle = document.getElementById('progress-circle');
+    const claimForm = document.getElementById('claim-form');
+    const actionArea = document.getElementById('action-area');
+    const fullDash = 440;
+
+    const timer = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            timerText.innerText = "OK!";
+            progressCircle.style.strokeDashoffset = fullDash;
+            actionArea.classList.add('hidden');
+            claimForm.classList.remove('hidden');
+        } else {
+            timerText.innerText = timeLeft + "s";
+            const offset = fullDash - (timeLeft / totalTime) * fullDash;
+            progressCircle.style.strokeDashoffset = offset;
+        }
+    }, 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-8 fade-in-up pb-10">
+    <div class="bg-white rounded-3xl shadow-soft overflow-hidden border border-gray-100">
+        <!-- Header -->
+        <div class="hero-gradient p-8 text-white text-center">
+            <div class="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                <i class="fas fa-user-astronaut text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold">Personnalisez votre Expérience</h1>
+            <p class="text-gray-100 text-sm mt-2">Répondez à ces quelques questions pour débloquer des opportunités sur-mesure.</p>
+        </div>
+
+        <!-- Form -->
+        <div class="p-6">
+            <form method="POST" action="{% url 'submit_survey' %}" id="surveyForm" class="space-y-6">
+                {% csrf_token %}
+                
+                <p class="text-gray-800 font-bold text-center text-lg mb-6">Quelles activités vous intéressent ?</p>
+
+                <!-- TRADING -->
+                <div class="interest-group">
+                    <label class="flex items-center p-4 rounded-2xl border-2 border-gray-100 hover:border-blue-500 cursor-pointer transition-all group bg-gray-50">
+                        <input type="checkbox" name="interests" value="trading" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 interest-check" onchange="toggleSub('trading')">
+                        <div class="ml-4">
+                            <span class="block font-bold text-gray-800">Trading</span>
+                        </div>
+                        <i class="fas fa-chart-line ml-auto text-gray-300 group-hover:text-blue-500"></i>
+                    </label>
+                    <div id="sub-trading" class="hidden mt-3 p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-3">
+                        <p class="text-xs font-bold text-blue-700 uppercase">Votre profil Trading :</p>
+                        <select name="trading_level" class="w-full p-2 text-sm rounded-xl border-blue-200">
+                            <option value="beginner">Débutant (Je veux apprendre)</option>
+                            <option value="intermediate">Intermédiaire (Je pratique un peu)</option>
+                            <option value="expert">Expert (Je suis rentable)</option>
+                        </select>
+                        <select name="trading_market" class="w-full p-2 text-sm rounded-xl border-blue-200">
+                            <option value="crypto">Cryptomonnaies</option>
+                            <option value="forex">Forex</option>
+                            <option value="indices">Indices (NAS100, US30)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- DROPSHIPPING -->
+                <div class="interest-group">
+                    <label class="flex items-center p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-500 cursor-pointer transition-all group bg-gray-50">
+                        <input type="checkbox" name="interests" value="dropshipping" class="w-5 h-5 text-purple-600 rounded border-gray-300 focus:ring-purple-500 interest-check" onchange="toggleSub('dropshipping')">
+                        <div class="ml-4">
+                            <span class="block font-bold text-gray-800">Dropshipping</span>
+                        </div>
+                        <i class="fas fa-shopping-cart ml-auto text-gray-300 group-hover:text-purple-500"></i>
+                    </label>
+                    <div id="sub-dropshipping" class="hidden mt-3 p-4 bg-purple-50 rounded-2xl border border-purple-100 space-y-3">
+                        <p class="text-xs font-bold text-purple-700 uppercase">Votre projet E-commerce :</p>
+                        <select name="dropshipping_status" class="w-full p-2 text-sm rounded-xl border-purple-200">
+                            <option value="no_shop">Je n'ai pas encore de boutique</option>
+                            <option value="has_shop">J'ai déjà une boutique active</option>
+                        </select>
+                        <select name="dropshipping_need" class="w-full p-2 text-sm rounded-xl border-purple-200">
+                            <option value="suppliers">Besoin de fournisseurs fiables</option>
+                            <option value="ads">Besoin d'aide pour la publicité</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- FREELANCING -->
+                <div class="interest-group">
+                    <label class="flex items-center p-4 rounded-2xl border-2 border-gray-100 hover:border-teal-500 cursor-pointer transition-all group bg-gray-50">
+                        <input type="checkbox" name="interests" value="freelancing" class="w-5 h-5 text-teal-600 rounded border-gray-300 focus:ring-teal-500 interest-check" onchange="toggleSub('freelancing')">
+                        <div class="ml-4">
+                            <span class="block font-bold text-gray-800">Freelancing</span>
+                        </div>
+                        <i class="fas fa-briefcase ml-auto text-gray-300 group-hover:text-teal-500"></i>
+                    </label>
+                    <div id="sub-freelancing" class="hidden mt-3 p-4 bg-teal-50 rounded-2xl border border-teal-100 space-y-3">
+                        <p class="text-xs font-bold text-teal-700 uppercase">Votre compétence :</p>
+                        <select name="freelancing_skill" class="w-full p-2 text-sm rounded-xl border-teal-200">
+                            <option value="writing">Rédaction & Traduction</option>
+                            <option value="data">Saisie de données / Excel</option>
+                            <option value="va">Assistance Virtuelle</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- SPORTS BETTING -->
+                <div class="interest-group">
+                    <label class="flex items-center p-4 rounded-2xl border-2 border-gray-100 hover:border-green-500 cursor-pointer transition-all group bg-gray-50">
+                        <input type="checkbox" name="interests" value="sports_betting" class="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 interest-check" onchange="toggleSub('sports_betting')">
+                        <div class="ml-4">
+                            <span class="block font-bold text-gray-800">Paris Sportifs</span>
+                        </div>
+                        <i class="fas fa-soccer-ball ml-auto text-gray-300 group-hover:text-green-500"></i>
+                    </label>
+                    <div id="sub-sports_betting" class="hidden mt-3 p-4 bg-green-50 rounded-2xl border border-green-100 space-y-3">
+                        <p class="text-xs font-bold text-green-700 uppercase">Votre stratégie :</p>
+                        <select name="betting_profile" class="w-full p-2 text-sm rounded-xl border-green-200">
+                            <option value="safe">Prudent (Petites côtes)</option>
+                            <option value="strategic">Stratégique (Montantes, etc.)</option>
+                            <option value="high">Gros parieur</option>
+                        </select>
+                        <div class="flex items-center space-x-2 p-2">
+                            <input type="checkbox" name="want_pronos" value="yes" checked class="rounded text-green-600">
+                            <span class="text-xs text-green-800">Recevoir nos pronostics gratuits</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEVELOPMENT -->
+                <div class="interest-group">
+                    <label class="flex items-center p-4 rounded-2xl border-2 border-gray-100 hover:border-indigo-500 cursor-pointer transition-all group bg-gray-50">
+                        <input type="checkbox" name="interests" value="development" class="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 interest-check" onchange="toggleSub('development')">
+                        <div class="ml-4">
+                            <span class="block font-bold text-gray-800">Développement & Info</span>
+                        </div>
+                        <i class="fas fa-laptop-code ml-auto text-gray-300 group-hover:text-indigo-500"></i>
+                    </label>
+                    <div id="sub-development" class="hidden mt-3 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-3">
+                        <p class="text-xs font-bold text-indigo-700 uppercase">Domaine d'intérêt :</p>
+                        <select name="dev_domain" class="w-full p-2 text-sm rounded-xl border-indigo-200">
+                            <option value="web">Développement Web (Sites)</option>
+                            <option value="mobile">Développement Mobile (Apps)</option>
+                            <option value="ai">Intelligence Artificielle & Data</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- DESIGN -->
+                <div class="interest-group">
+                    <label class="flex items-center p-4 rounded-2xl border-2 border-gray-100 hover:border-pink-500 cursor-pointer transition-all group bg-gray-50">
+                        <input type="checkbox" name="interests" value="graphic_design" class="w-5 h-5 text-pink-600 rounded border-gray-300 focus:ring-pink-500 interest-check" onchange="toggleSub('graphic_design')">
+                        <div class="ml-4">
+                            <span class="block font-bold text-gray-800">Design & Multimédia</span>
+                        </div>
+                        <i class="fas fa-pen-nib ml-auto text-gray-300 group-hover:text-pink-500"></i>
+                    </label>
+                    <div id="sub-graphic_design" class="hidden mt-3 p-4 bg-pink-50 rounded-2xl border border-pink-100 space-y-3">
+                        <p class="text-xs font-bold text-pink-700 uppercase">Votre outil principal :</p>
+                        <select name="design_tool" class="w-full p-2 text-sm rounded-xl border-pink-200">
+                            <option value="canva">Canva (Débutant/Intermédiaire)</option>
+                            <option value="adobe">Suite Adobe (Pro)</option>
+                            <option value="video">Montage Vidéo Mobile (CapCut, etc.)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full mining-gradient text-white font-bold py-4 rounded-2xl shadow-lg hover:opacity-90 transition-opacity mt-6 pulse-animation">
+                    Terminer et Découvrir mes Tâches <i class="fas fa-check-circle ml-2"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleSub(id) {
+        const sub = document.getElementById('sub-' + id);
+        if (sub.classList.contains('hidden')) {
+            sub.classList.remove('hidden');
+            sub.classList.add('fade-in-up');
+        } else {
+            sub.classList.add('hidden');
+        }
+    }
+</script>
+{% endblock %}

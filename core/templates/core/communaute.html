@@ -1,0 +1,125 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-md mx-auto fade-in-up pb-10">
+    
+    <!-- Hero Section -->
+    <div class="hero-gradient p-8 rounded-b-[40px] text-white text-center shadow-lg mb-8">
+        <div class="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+            <i class="fas fa-users-rays text-3xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold">Votre Hub Communauté</h1>
+        <p class="text-gray-100 text-xs mt-2">Accédez aux ressources et groupes adaptés à votre profil {{ username }}.</p>
+    </div>
+
+    <!-- Sections Dynamiques -->
+    <div class="px-2 space-y-6">
+
+        {% if 'trading' in interests %}
+        <!-- Trading Section -->
+        <div class="bg-white rounded-3xl p-5 shadow-soft border-l-4 border-blue-500 scale-in">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mr-3">
+                    <i class="fas fa-chart-line text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-gray-800">Espace Trading</h2>
+                    <span class="text-[10px] text-blue-500 font-bold uppercase">{{ data.trading.level|default:"Passionné" }} • {{ data.trading.market|default:"Marchés" }}</span>
+                </div>
+            </div>
+            
+            <p class="text-xs text-gray-600 mb-4 italic">
+                {% if data.trading.level == 'beginner' %}
+                    "Tout commence ici ! Rejoignez notre canal de formation gratuite."
+                {% elif data.trading.level == 'expert' %}
+                    "Partagez vos signaux et profitez d'analyses NAS100/US30."
+                {% else %}
+                    "Progressez avec notre communauté de traders actifs."
+                {% endif %}
+            </p>
+
+            <a href="https://t.me/your_trading_group" target="_blank" class="block w-full bg-blue-600 text-white text-center py-3 rounded-2xl text-xs font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                <i class="fab fa-telegram mr-2"></i> Rejoindre Trading VIP
+            </a>
+        </div>
+        {% endif %}
+
+        {% if 'sports_betting' in interests %}
+        <!-- Paris Sportifs Section -->
+        <div class="bg-white rounded-3xl p-5 shadow-soft border-l-4 border-green-500 scale-in">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center mr-3">
+                    <i class="fas fa-soccer-ball text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-gray-800">Cercle des Parieurs</h2>
+                    <span class="text-[10px] text-green-500 font-bold uppercase">{{ data.sports_betting.profile|default:"Stratège" }}</span>
+                </div>
+            </div>
+            
+            <p class="text-xs text-gray-600 mb-4 italic">
+                {% if data.sports_betting.profile == 'safe' %}
+                    "Objectif : Gain sûr avec des côtes maîtrisées."
+                {% else %}
+                    "Prêt pour la montante du jour ? Suivez nos pronostics."
+                {% endif %}
+            </p>
+
+            <a href="https://t.me/your_betting_group" target="_blank" class="block w-full bg-green-600 text-white text-center py-3 rounded-2xl text-xs font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-100">
+                <i class="fab fa-telegram mr-2"></i> Voir les Pronostics
+            </a>
+        </div>
+        {% endif %}
+
+        {% if 'freelancing' in interests or 'dropshipping' in interests %}
+        <!-- Business Section -->
+        <div class="bg-white rounded-3xl p-5 shadow-soft border-l-4 border-purple-500 scale-in">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mr-3">
+                    <i class="fas fa-briefcase text-lg"></i>
+                </div>
+                <h2 class="font-bold text-gray-800">Business & E-commerce</h2>
+            </div>
+            
+            <p class="text-xs text-gray-600 mb-4 italic">
+                {% if data.freelancing.skill == 'writing' %}
+                    "Vos talents de rédacteur valent de l'argent. Rejoignez nos experts."
+                {% elif data.dropshipping.status == 'no_shop' %}
+                    "On vous aide à créer votre première boutique."
+                {% else %}
+                    "Boostez vos ventes avec nos hacks marketing."
+                {% endif %}
+            </p>
+
+            <a href="https://t.me/your_business_group" target="_blank" class="block w-full bg-purple-600 text-white text-center py-3 rounded-2xl text-xs font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-100">
+                <i class="fas fa-rocket mr-2"></i> Rejoindre E-commerce Pro
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Développement & Info Section -->
+        {% if 'development' in interests %}
+        <div class="bg-white rounded-3xl p-5 shadow-soft border-l-4 border-indigo-500 scale-in">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mr-3">
+                    <i class="fas fa-laptop-code text-lg"></i>
+                </div>
+                <h2 class="font-bold text-gray-800">Labo Dev & Info</h2>
+            </div>
+            <p class="text-xs text-gray-600 mb-4 italic">"Le code est l'avenir. Partagez vos projets {{ data.development.domain }}."</p>
+            <a href="https://discord.gg/your_server" target="_blank" class="block w-full bg-indigo-600 text-white text-center py-3 rounded-2xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                <i class="fab fa-discord mr-2"></i> Accéder au Discord
+            </a>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Message de soutien -->
+    <div class="mt-10 p-6 text-center text-gray-400">
+        <p class="text-[10px] uppercase font-bold tracking-widest">GainTime © 2026</p>
+        <p class="text-xs mt-1">Bâtissons ensemble une communauté d'élite.</p>
+    </div>
+</div>
+{% endblock %}

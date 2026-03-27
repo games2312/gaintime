@@ -1,0 +1,44 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Mes Notifications - GainTime{% endblock %}
+
+{% block content %}
+<div class="mb-6 mt-4 flex justify-between items-center px-2">
+    <h2 class="text-xl font-bold text-gray-800">Notifications</h2>
+    <span class="text-xs text-gray-500">{{ notifications.count }} message{{ notifications.count|pluralize }}</span>
+</div>
+
+<div class="space-y-4">
+    {% for notification in notifications %}
+    <div class="bg-white rounded-2xl p-4 shadow-soft border-l-4 {% if not notification.is_read %}border-blue-500 bg-blue-50/30{% else %}border-gray-200{% endif %} transition-all duration-300">
+        <div class="flex items-start">
+            <div class="w-10 h-10 rounded-full {% if not notification.is_read %}bg-blue-100 text-blue-600{% else %}bg-gray-100 text-gray-400{% endif %} flex items-center justify-center mr-4 flex-shrink-0">
+                <i class="fas {% if 'validé' in notification.title|lower or 'succès' in notification.title|lower %}fa-check-circle{% elif 'expiré' in notification.title|lower or 'rejeté' in notification.title|lower %}fa-exclamation-triangle{% else %}fa-bell{% endif %}"></i>
+            </div>
+            <div class="flex-1">
+                <div class="flex justify-between items-start mb-1">
+                    <h3 class="font-bold text-sm text-gray-800">{{ notification.title }}</h3>
+                    <span class="text-[10px] text-gray-400 font-medium">{{ notification.created_at|date:"d/m H:i" }}</span>
+                </div>
+                <p class="text-xs text-gray-600 leading-relaxed">
+                    {{ notification.message }}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-20 bg-white rounded-3xl shadow-soft">
+        <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300 text-3xl">
+            <i class="fas fa-comment-slash"></i>
+        </div>
+        <p class="text-gray-500 font-medium">Aucune notification pour le moment.</p>
+        <p class="text-[10px] text-gray-400 mt-1">Vous serez informé ici de l'activité de votre compte.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="mt-8 px-4 text-center">
+    <p class="text-[10px] text-gray-400 italic">Les notifications sont automatiquement marquées comme lues après consultation.</p>
+</div>
+{% endblock %}

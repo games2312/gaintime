@@ -1,0 +1,123 @@
+{% extends 'core/admin/admin_base.html' %}
+{% block title %}Dashboard - Admin{% endblock %}
+
+{% block content %}
+<div class="mb-8 mt-4 fade-in-up">
+    <h2 class="text-2xl font-black text-slate-800">Tableau de Bord</h2>
+    <p class="text-xs text-slate-500 font-medium uppercase tracking-widest">Aujourd'hui : {{ "now"|date:"d F Y" }}</p>
+</div>
+
+<!-- Grille de Statistiques -->
+<div class="grid grid-cols-2 gap-4 mb-8">
+    <div class="bg-white p-5 rounded-[2rem] shadow-soft border border-slate-100 scale-in">
+        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-3">
+            <i class="fas fa-users"></i>
+        </div>
+        <p class="text-[10px] uppercase text-slate-400 font-bold">Total Membres</p>
+        <p class="text-2xl font-black text-slate-800">{{ total_users }}</p>
+        <p class="text-[9px] text-green-600 font-bold mt-1">+{{ new_users_today }} aujourd'hui</p>
+    </div>
+
+    <div class="bg-white p-5 rounded-[2rem] shadow-soft border border-slate-100 scale-in" style="animation-delay: 0.1s">
+        <div class="w-10 h-10 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mb-3">
+            <i class="fas fa-money-bill-wave"></i>
+        </div>
+        <p class="text-[10px] uppercase text-slate-400 font-bold">Dépôts (Jour)</p>
+        <p class="text-2xl font-black text-slate-800">{{ deposited_today|floatformat:0 }} F</p>
+        <p class="text-[9px] text-slate-400 mt-1">Cumul: {{ total_deposited|floatformat:0 }} F</p>
+    </div>
+</div>
+
+<!-- Alertes et Actions Urgentes -->
+<div class="space-y-4 mb-8">
+    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2">Actions Urgentes</h3>
+    
+    <a href="{% url 'admin_transactions' 'deposits' %}" class="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-soft scale-in" style="animation-delay: 0.2s">
+        <div class="flex items-center">
+            <div class="w-12 h-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-orange-200">
+                <i class="fas fa-arrow-down"></i>
+            </div>
+            <div>
+                <p class="font-bold text-slate-800 text-sm">Dépôts</p>
+                <p class="text-[10px] {% if pending_deposits.count > 0 %}text-orange-600 animate-pulse{% else %}text-slate-400{% endif %} font-bold">
+                    {{ pending_deposits.count }} en attente
+                </p>
+            </div>
+        </div>
+        <div class="bg-slate-50 p-2 rounded-xl text-slate-400">
+            <i class="fas fa-chevron-right text-xs"></i>
+        </div>
+    </a>
+
+    <a href="{% url 'admin_transactions' 'withdrawals' %}" class="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-soft scale-in" style="animation-delay: 0.3s">
+        <div class="flex items-center">
+            <div class="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-blue-200">
+                <i class="fas fa-paper-plane"></i>
+            </div>
+            <div>
+                <p class="font-bold text-slate-800 text-sm">Retraits</p>
+                <p class="text-[10px] {% if pending_withdrawals.count > 0 %}text-blue-600 animate-pulse{% else %}text-slate-400{% endif %} font-bold">
+                    {{ pending_withdrawals.count }} à traiter
+                </p>
+            </div>
+        </div>
+        <div class="bg-slate-50 p-2 rounded-xl text-slate-400">
+            <i class="fas fa-chevron-right text-xs"></i>
+        </div>
+    </a>
+
+    <a href="{% url 'admin_review_tasks' %}" class="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-soft scale-in" style="animation-delay: 0.4s">
+        <div class="flex items-center">
+            <div class="w-12 h-12 bg-purple-600 text-white rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-purple-200">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <div>
+                <p class="font-bold text-slate-800 text-sm">Tâches</p>
+                <p class="text-[10px] {% if pending_tasks > 0 %}text-purple-600 animate-pulse{% else %}text-slate-400{% endif %} font-bold">
+                    {{ pending_tasks }} preuves à revoir
+                </p>
+            </div>
+        </div>
+        <div class="bg-slate-50 p-2 rounded-xl text-slate-400">
+            <i class="fas fa-chevron-right text-xs"></i>
+        </div>
+    <a href="{% url 'admin_users' %}" class="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-soft scale-in" style="animation-delay: 0.5s">
+        <div class="flex items-center">
+            <div class="w-12 h-12 bg-slate-800 text-white rounded-2xl flex items-center justify-center mr-4">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div>
+                <p class="font-bold text-slate-800 text-sm">Tous les Membres</p>
+                <p class="text-[10px] {% if suspicious_ips_count > 0 %}text-red-600 font-black{% else %}text-slate-400{% endif %}>
+                    {% if suspicious_ips_count > 0 %}
+                    ⚠️ {{ suspicious_ips_count }} réseaux suspects détectés
+                    {% else %}
+                    Sécurité OK : Aucune fraude détectée
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="bg-slate-50 p-2 rounded-xl text-slate-400">
+            <i class="fas fa-chevron-right text-xs"></i>
+        </div>
+    </a>
+</div>
+
+<!-- Menu Système Rapide -->
+<div class="bg-slate-900 rounded-[2.5rem] p-6 shadow-xl mb-10">
+    <h3 class="text-white font-bold text-sm mb-4">Configuration Système</h3>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+        <a href="{% url 'admin_manage_vip' %}" class="bg-white/10 border border-white/10 p-4 rounded-2xl flex flex-col items-center hover:bg-white/20 transition">
+            <i class="fas fa-crown text-yellow-400 mb-2 text-xl"></i>
+            <span class="text-[10px] text-white font-bold">Packs VIP</span>
+        </a>
+        <a href="{% url 'admin_manage_tasks' %}" class="bg-white/10 border border-white/10 p-4 rounded-2xl flex flex-col items-center hover:bg-white/20 transition">
+            <i class="fas fa-plus-circle text-green-400 mb-2 text-xl"></i>
+            <span class="text-[10px] text-white font-bold">Gérer Tâches</span>
+        </a>
+    </div>
+    <a href="{% url 'admin_export_withdrawals' %}" class="block w-full bg-blue-600 text-white text-center py-3 rounded-xl text-xs font-bold shadow-lg active:scale-95 transition-all">
+        <i class="fas fa-file-export mr-2"></i> EXPORTER LES RETRAITS (CSV)
+    </a>
+</div>
+{% endblock %}

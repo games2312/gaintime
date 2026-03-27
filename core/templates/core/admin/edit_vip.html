@@ -1,0 +1,31 @@
+{% extends 'core/admin/admin_base.html' %}
+{% block title %}{{ action }} Pack VIP - Admin{% endblock %}
+
+{% block content %}
+<div class="mb-6 mt-4 px-2">
+    <a href="{% url 'admin_manage_vip' %}" class="text-blue-600 text-xs mb-1 block"><i class="fas fa-arrow-left mr-1"></i> Annuler</a>
+    <h2 class="text-xl font-bold text-gray-800">{{ action }} un Pack VIP</h2>
+</div>
+
+<div class="bg-white rounded-[2.5rem] p-8 shadow-soft border border-gray-50 fade-in-up">
+    <form method="POST" class="space-y-6">
+        {% csrf_token %}
+        
+        {% for field in form %}
+        <div>
+            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-2 ml-1">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <p class="text-red-500 text-[10px] mt-1 ml-1">{{ field.errors.0 }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="pt-4">
+            <button type="submit" class="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-xl uppercase tracking-widest text-xs active:scale-95 transition-all">
+                ENREGISTRER LE PACK
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

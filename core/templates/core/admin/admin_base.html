@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GainTime Admin - {% block title %}{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { font-family: 'Poppins', sans-serif; }
+        .admin-sidebar { background: #1e293b; color: white; }
+        .shadow-soft { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    
+    <!-- Header Admin -->
+    <header class="bg-white border-b border-gray-200 py-4 px-6 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center">
+            <div class="bg-red-600 text-white font-bold text-lg p-2 rounded-lg mr-3">GT</div>
+            <h1 class="font-bold text-gray-800 uppercase tracking-wider">Management Panel</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-xs font-medium text-gray-500">Admin: {{ user.username }}</span>
+            <a href="{% url 'logout' %}" class="text-red-600 hover:text-red-800"><i class="fas fa-power-off"></i></a>
+        </div>
+    </header>
+
+    <main class="p-4 pb-24">
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="p-3 rounded-xl text-sm {% if message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Navigation Admin (Bottom) -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-3 px-6 flex justify-around items-center shadow-lg z-50">
+        <a href="{% url 'admin_dashboard' %}" class="flex flex-col items-center {% if request.resolver_match.url_name == 'admin_dashboard' %}text-red-600{% else %}text-gray-400{% endif %}">
+            <i class="fas fa-chart-line text-xl"></i>
+            <span class="text-[10px] mt-1 font-bold">Stats</span>
+        </a>
+        <a href="{% url 'admin_transactions' 'deposits' %}" class="flex flex-col items-center {% if type == 'deposits' %}text-red-600{% else %}text-gray-400{% endif %}">
+            <i class="fas fa-wallet text-xl"></i>
+            <span class="text-[10px] mt-1 font-bold">Dépôts</span>
+        </a>
+        <a href="{% url 'admin_transactions' 'withdrawals' %}" class="flex flex-col items-center {% if type == 'withdrawals' %}text-red-600{% else %}text-gray-400{% endif %}">
+            <i class="fas fa-money-bill-wave text-xl"></i>
+            <span class="text-[10px] mt-1 font-bold">Retraits</span>
+        </a>
+        <a href="{% url 'admin_users' %}" class="flex flex-col items-center {% if request.resolver_match.url_name == 'admin_users' %}text-red-600{% else %}text-gray-400{% endif %}">
+            <i class="fas fa-users text-xl"></i>
+            <span class="text-[10px] mt-1 font-bold">Membres</span>
+        </a>
+        <a href="{% url 'home' %}" class="flex flex-col items-center text-gray-400">
+            <i class="fas fa-globe text-xl"></i>
+            <span class="text-[10px] mt-1 font-bold">Site</span>
+        </a>
+    </nav>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

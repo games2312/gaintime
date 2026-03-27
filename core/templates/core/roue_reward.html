@@ -1,0 +1,282 @@
+{% extends 'core/base.html' %}
+{% block title %}Spin & Win - GainTime{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --wheel-border: #1e293b;
+        --wheel-gold: #f59e0b;
+    }
+
+    .wheel-main-container {
+        position: relative;
+        width: 320px;
+        height: 320px;
+        margin: 0 auto;
+        padding: 10px;
+        background: var(--wheel-border);
+        border-radius: 50%;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3), inset 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    /* Lumières autour de la roue */
+    .lights-container {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        border-radius: 50%;
+        z-index: 2;
+        pointer-events: none;
+    }
+    .light {
+        position: absolute;
+        width: 6px; height: 6px;
+        background: #fff;
+        border-radius: 50%;
+        top: 50%; left: 50%;
+        transform-origin: 0 160px;
+        box-shadow: 0 0 10px #fff;
+        animation: blink 1s infinite;
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 1; transform: translate(-50%, -160px) scale(1); }
+        50% { opacity: 0.3; transform: translate(-50%, -160px) scale(0.8); }
+    }
+
+    #wheel-wrapper {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1);
+        position: relative;
+        overflow: hidden;
+        border: 4px solid var(--wheel-gold);
+    }
+
+    .pointer-container {
+        position: absolute;
+        top: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
+    }
+    .arrow {
+        width: 0; height: 0;
+        border-left: 20px solid transparent;
+        border-right: 20px solid transparent;
+        border-top: 40px solid #ef4444;
+        position: relative;
+    }
+    .arrow::after {
+        content: '';
+        position: absolute;
+        top: -45px; left: -5px;
+        width: 10px; height: 10px;
+        background: #ef4444;
+        border-radius: 50%;
+    }
+
+    .center-pin {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 50px; height: 50px;
+        background: white;
+        border: 4px solid var(--wheel-border);
+        border-radius: 50%;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: var(--wheel-border);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .spin-btn {
+        background: linear-gradient(135deg, #059669 0%, #1e40af 100%);
+        box-shadow: 0 10px 20px rgba(5, 150, 105, 0.3);
+    }
+    .spin-btn:disabled {
+        background: #94a3b8;
+        box-shadow: none;
+        transform: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="text-center mt-8 mb-10 px-4">
+    <div class="inline-flex items-center bg-yellow-100 text-yellow-700 text-[10px] font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-widest">
+        <i class="fas fa-star mr-1"></i> Bonus: {{ free_spins }} tour{{ free_spins|pluralize }} disponible{{ free_spins|pluralize }}
+    </div>
+    <h2 class="text-3xl font-extrabold text-gray-800">Spin & Win</h2>
+    <p id="timer-display" class="text-gray-500 text-xs mt-1">
+        {% if can_spin %}Tentez votre chance maintenant !{% else %}Prochain tour gratuit dans --:--:--{% endif %}
+    </p>
+</div>
+
+<div class="wheel-main-container mb-12">
+    <!-- Pointeur (Flèche) -->
+    <div class="pointer-container">
+        <div class="arrow"></div>
+    </div>
+
+    <!-- Lumières clignotantes -->
+    <div class="lights-container" id="lights"></div>
+
+    <!-- Axe central -->
+    <div class="center-pin">GT</div>
+
+    <!-- La Roue -->
+    <div id="wheel-wrapper">
+        <canvas id="wheelCanvas" width="300" height="300"></canvas>
+    </div>
+</div>
+
+<div class="text-center px-8">
+    <div id="status-msg" class="mb-6 h-6 text-sm font-bold text-blue-600 italic"></div>
+    
+    <button id="spin-button" {% if not can_spin %}disabled{% endif %} class="spin-btn w-full py-5 rounded-2xl text-white font-bold text-xl transition-all transform active:scale-95 mb-4 shadow-xl">
+        {% if can_spin %}TENTER MA CHANCE{% else %}REVIENS DEMAIN{% endif %}
+    </button>
+    
+    <div class="flex items-center justify-center space-x-2 text-gray-400">
+        <i class="fas fa-lock text-[10px]"></i>
+        <p class="text-[10px] uppercase tracking-widest font-bold">Système certifié équitable</p>
+    </div>
+</div>
+
+<!-- Modal de gain -->
+<div id="winModal" class="fixed inset-0 bg-black/80 hidden z-[100] flex items-center justify-center p-6 backdrop-blur-sm">
+    <div class="bg-white rounded-[2.5rem] w-full max-w-xs p-8 text-center shadow-2xl border-4 border-yellow-400">
+        <div class="w-24 h-24 bg-gradient-to-tr from-yellow-400 to-orange-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-lg animate-bounce">
+            <i class="fas fa-coins"></i>
+        </div>
+        <h3 class="text-2xl font-black text-gray-800 mb-2">BRAVO !</h3>
+        <p id="win-text" class="text-gray-600 font-medium mb-8 text-lg"></p>
+        <button onclick="location.reload()" class="w-full bg-gray-900 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-black transition-all">
+            ENCAISSER
+        </button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Génération des lumières
+    const lightsContainer = document.getElementById('lights');
+    for (let i = 0; i < 12; i++) {
+        const light = document.createElement('div');
+        light.className = 'light';
+        light.style.transform = `rotate(${i * 30}deg) translate(-50%, -160px)`;
+        light.style.animationDelay = `${i * 0.1}s`;
+        lightsContainer.appendChild(light);
+    }
+
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const prizes = ['5 F', '10 F', '20 F', 'PERDU', '50 F', '100 F'];
+    const colors = ['#1e40af', '#059669', '#d97706', '#475569', '#7c3aed', '#be185d'];
+    
+    function drawWheel() {
+        const slice = (Math.PI * 2) / prizes.length;
+        ctx.clearRect(0, 0, 300, 300);
+        
+        for(let i=0; i<prizes.length; i++) {
+            const angle = i * slice;
+            ctx.beginPath();
+            ctx.fillStyle = colors[i];
+            ctx.moveTo(150, 150);
+            ctx.arc(150, 150, 150, angle, angle + slice);
+            ctx.fill();
+            
+            // Bordure de segment
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            ctx.translate(150, 150);
+            ctx.rotate(angle + slice / 2);
+            ctx.textAlign = "right";
+            ctx.font = "bold 18px Poppins";
+            ctx.fillText(prizes[i], 135, 10);
+            ctx.restore();
+        }
+    }
+    drawWheel();
+
+    const spinBtn = document.getElementById('spin-button');
+    const wheel = document.getElementById('wheel-wrapper');
+    const statusMsg = document.getElementById('status-msg');
+    const timerDisplay = document.getElementById('timer-display');
+
+    // Gestion du compte à rebours
+    let remainingSeconds = {{ remaining_seconds|default:0 }};
+    if (remainingSeconds > 0 && {{ free_spins }} === 0) {
+        function updateCountdown() {
+            if (remainingSeconds <= 0) {
+                location.reload();
+                return;
+            }
+            const h = Math.floor(remainingSeconds / 3600);
+            const m = Math.floor((remainingSeconds % 3600) / 60);
+            const s = remainingSeconds % 60;
+            timerDisplay.innerText = `Prochain tour gratuit dans ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            remainingSeconds--;
+        }
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+    }
+
+    spinBtn.addEventListener('click', function() {
+        spinBtn.disabled = true;
+        statusMsg.innerText = "La roue tourne...";
+
+        fetch('{% url "spin_wheel" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                // Calcul de la rotation : 
+                // prizes.length = 6 segments de 60 deg
+                // L'index 0 (5F) commence à 0 rad sur le canvas (est).
+                // Le pointeur est au nord (-90 deg).
+                const sliceDegree = 360 / prizes.length;
+                
+                // Pour que l'index tombe sous le pointeur (en haut)
+                // On doit compenser le décalage de 90 deg du canvas
+                const extraSpins = 360 * 8; // 8 tours complets
+                const stopAt = extraSpins + (360 - (data.index * sliceDegree)) - 90 - (sliceDegree/2);
+                
+                wheel.style.transform = `rotate(${stopAt}deg)`;
+
+                setTimeout(() => {
+                    if(data.amount > 0) {
+                        document.getElementById('win-text').innerText = `Tu as gagné ${data.amount} FCFA !`;
+                        document.getElementById('winModal').classList.remove('hidden');
+                    } else {
+                        statusMsg.innerText = "Mince ! Pas de chance aujourd'hui.";
+                        statusMsg.classList.add('text-red-500');
+                        setTimeout(() => location.reload(), 2500);
+                    }
+                }, 5500);
+            } else {
+                alert(data.message);
+                spinBtn.disabled = false;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            spinBtn.disabled = false;
+        });
+    });
+</script>
+{% endblock %}

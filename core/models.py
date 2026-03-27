@@ -1,0 +1,225 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.utils import timezone
+from django.core.validators import RegexValidator
+from decimal import Decimal
+import random
+import string
+
+# --- VALIDATEURS ---
+phone_validator = RegexValidator(
+    regex=r'^(6|2)[0-9]{8}$',
+    message="Le numéro doit être un format camerounais valide (9 chiffres, ex: 6xxxxxxxx)."
+)
+
+def generate_invitation_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+# --- MODÈLES ---
+
+CATEGORY_CHOICES = [
+    ('trading', 'Trading'),
+    ('dropshipping', 'Dropshipping'),
+    ('content_creation', 'Création de contenu'),
+    ('digital_products', 'Vente de produits digitaux'),
+    ('freelancing', 'Freelancing'),
+    ('sports_betting', 'Paris Sportifs'),
+    ('development', 'Développement & Informatique'),
+    ('graphic_design', 'Design & Multimédia'),
+    ('digital_marketing', 'Marketing Digital'),
+    ('general', 'Général'),
+    ('other', 'Autre'),
+]
+
+class VIPLevel(models.Model):
+    """
+    Configuration des niveaux VIP (Prix, Gains, Limites).
+    """
+    name = models.CharField(max_length=50, verbose_name="Nom du Niveau") # Ex: VIP 1, Bronze
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Prix d'achat")
+    
+    # Avantages
+    daily_mining_reward = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Gain Minage (par session)")
+    daily_task_limit = models.IntegerField(default=0, verbose_name="Nb Tâches / Jour")
+    task_reward_rate = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Gain par Tâche")
+    
+    # Nouveau : Récompense de parrainage quand un filleul commence à miner
+    referral_reward = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('500.00'), verbose_name="Bonus Parrainage (Invitation)")
+    
+    # Durée de validité (en jours)
+    validity_days = models.IntegerField(default=120, verbose_name="Validité (Jours)")
+    
+    image = models.CharField(max_length=100, blank=True, null=True, verbose_name="Icône (ex: fas fa-crown)")
+
+    def __str__(self):
+        return f"{self.name} - {self.price} FCFA"
+    
+    class Meta:
+        verbose_name = "Niveau VIP"
+        verbose_name_plural = "Niveaux VIP"
+        ordering = ['price']
+
+class Notification(models.Model):
+    user = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=100)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+class FAQ(models.Model):
+    question = models.CharField(max_length=255)
+    answer = models.TextField()
+    order = models.IntegerField(default=0, verbose_name="Ordre d'affichage")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "FAQ"
+        verbose_name_plural = "FAQs"
+        ordering = ['order']
+
+    def __str__(self):
+        return self.question
+
+class CustomUser(AbstractUser):
+    phone_number = models.CharField(max_length=15, unique=True, validators=[phone_validator], verbose_name="Numéro de portable")
+    invitation_code = models.CharField(max_length=10, unique=True, verbose_name="Code d'invitation")
+    referred_by = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='referrals')
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    
+    # Gestion VIP
+    vip_level = models.ForeignKey(VIPLevel, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Niveau VIP Actuel")
+    vip_expiry_date = models.DateTimeField(null=True, blank=True, verbose_name="Expiration VIP")
+
+    # Anti-fraude parrainage
+    has_triggered_referral_bonus = models.BooleanField(default=False, verbose_name="A déjà généré un bonus parrain")
+
+    # Bonus Quotidien
+    last_check_in = models.DateField(null=True, blank=True, verbose_name="Dernier Check-in")
+    check_in_streak = models.IntegerField(default=0, verbose_name="Série actuelle")
+    last_spin_time = models.DateTimeField(null=True, blank=True, verbose_name="Dernier tour de roue")
+    free_spins = models.IntegerField(default=0, verbose_name="Tours gratuits bonus")
+
+    # Sécurité Multi-comptes
+    registration_ip = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP Inscription")
+    last_ip = models.GenericIPAddressField(null=True, blank=True, verbose_name="Dernière IP connue")
+
+    # Personnalisation Communauté
+    has_completed_survey = models.BooleanField(default=False, verbose_name="Sondage complété")
+    interests = models.CharField(max_length=255, blank=True, null=True, verbose_name="Centres d'intérêt")
+    survey_data = models.JSONField(default=dict, blank=True, null=True, verbose_name="Données détaillées du sondage")
+
+    # Statistiques et Sécurité Financière
+    total_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="Gains Totaux cumulés")
+    withdrawal_phone_locked = models.CharField(max_length=15, blank=True, null=True, verbose_name="Numéro de retrait verrouillé")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.invitation_code:
+            code = generate_invitation_code()
+            while CustomUser.objects.filter(invitation_code=code).exists():
+                code = generate_invitation_code()
+            self.invitation_code = code
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.username} ({self.vip_level.name if self.vip_level else 'Gratuit'})"
+
+class MiningSession(models.Model):
+    DURATION_HOURS = 12
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    start_time = models.DateTimeField(auto_now_add=True)
+    end_time = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    is_claimed = models.BooleanField(default=False)
+    earned_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+
+    def save(self, *args, **kwargs):
+        if not self.end_time:
+            self.end_time = timezone.now() + timezone.timedelta(hours=self.DURATION_HOURS)
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_completed(self):
+        return timezone.now() >= self.end_time
+
+class Task(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    platform = models.CharField(max_length=50, choices=[
+        ('youtube', 'YouTube'), 
+        ('facebook', 'Facebook'), 
+        ('tiktok', 'TikTok'), 
+        ('whatsapp', 'WhatsApp'), 
+        ('instagram', 'Instagram'), 
+        ('telegram', 'Telegram'), 
+        ('internal', 'Plateforme'),
+        ('other', 'Autre')
+    ], default='other')
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='general', verbose_name="Catégorie")
+    link = models.URLField(blank=True, null=True)
+    reward_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Nouveau : Compte à rebours
+    duration_seconds = models.PositiveIntegerField(default=30, verbose_name="Durée (secondes)")
+    is_automatic = models.BooleanField(default=False, verbose_name="Validation automatique (Timer)")
+    
+    # Restriction VIP
+    min_vip_required = models.ForeignKey(VIPLevel, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="VIP Min Requis")
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+class UserTaskCompletion(models.Model):
+    STATUS_CHOICES = (
+        ('PENDING', 'En attente'),
+        ('APPROVED', 'Validé'),
+        ('REJECTED', 'Rejeté'),
+    )
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    # Remplacement de ImageField par FileField pour éviter l'erreur Pillow si l'installation échoue
+    screenshot = models.FileField(upload_to='tasks/proofs/', null=True, blank=True, verbose_name="Capture d'écran")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    completed_at = models.DateTimeField(auto_now_add=True) # Date précise pour vérifier la limite journalière
+
+    class Meta:
+        verbose_name = "Tâche réalisée"
+        verbose_name_plural = "Tâches réalisées"
+
+class Transaction(models.Model):
+    TYPE_CHOICES = (
+        ('DEPOSIT', 'Dépôt'),
+        ('WITHDRAWAL', 'Retrait'),
+        ('MINING_REWARD', 'Gain Minage'),
+        ('TASK_REWARD', 'Gain Tâche'),
+        ('VIP_PURCHASE', 'Achat VIP'),
+        ('REFERRAL_BONUS', 'Bonus Parrainage'),
+        ('DAILY_CHECKIN', 'Bonus Quotidien'),
+        ('SPIN_WIN', 'Roue de la Fortune'),
+    )
+    STATUS_CHOICES = (
+        ('PENDING', 'En attente'),
+        ('COMPLETED', 'Validé'),
+        ('REJECTED', 'Rejeté'),
+    )
+    METHOD_CHOICES = (('OM', 'Orange Money'), ('MOMO', 'MTN MoMo'), ('SYSTEM', 'Système'))
+
+    user = models.ForeignKey(CustomUser, on_delete=models.PROTECT, related_name='transactions')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    transaction_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    payment_method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='SYSTEM')
+    reference_id = models.CharField(max_length=100, blank=True, null=True)
+    proof_image = models.FileField(upload_to='deposits/proofs/', null=True, blank=True, verbose_name="Preuve de dépôt")
+    description = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.get_transaction_type_display()} - {self.amount}"
