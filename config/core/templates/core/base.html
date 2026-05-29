@@ -28,6 +28,8 @@
             --accent-purple: #8B5CF6;
             --text-main: #F8FAFC;
             --text-muted: #94A3B8;
+            --skeleton-base: rgba(255, 255, 255, 0.05);
+            --skeleton-shine: rgba(255, 255, 255, 0.1);
         }
 
         .light-mode {
@@ -82,10 +84,45 @@
         
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in-up { animation: fadeInUp 0.5s ease-out both; }
+
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .skeleton {
+            background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 12px;
+        }
+        .skeleton-text { height: 14px; width: 60%; margin-bottom: 8px; }
+        .skeleton-title { height: 20px; width: 40%; margin-bottom: 12px; }
+        .skeleton-card { height: 100px; width: 100%; margin-bottom: 12px; }
+        .skeleton-circle { height: 48px; width: 48px; border-radius: 50%; }
+
+        .htmx-indicator { opacity: 0; transition: opacity 0.2s ease-in; }
+        .htmx-request .htmx-indicator { opacity: 1; }
+        .htmx-request.htmx-indicator { opacity: 1; }
+
+        .coin-rain {
+            position: fixed; top: -20px; pointer-events: none; z-index: 9999;
+            animation: coinFall 1.5s ease-in forwards;
+        }
+        @keyframes coinFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01s !important; transition-duration: 0.01s !important; }
+        }
+
+        .skip-link { position: absolute; top: -100%; left: 8px; z-index: 10000; padding: 8px 16px; background: var(--primary-gold); color: white; border-radius: 8px; font-weight: bold; }
+        .skip-link:focus { top: 8px; }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body class="no-scrollbar">
+    <a href="#main-content" class="skip-link">Aller au contenu</a>
+
+    <!-- HTMX global indicator -->
+    <div class="htmx-indicator fixed top-4 left-1/2 -translate-x-1/2 z-[9999] gold-gradient text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg">
+        <i class="fas fa-spinner fa-spin mr-2"></i> Chargement...
+    </div>
     {% if user.is_authenticated %}
     <!-- Modern Header -->
     <header class="fixed top-4 left-4 right-4 z-50 glass-card p-3 flex justify-between items-center shadow-xl">
@@ -113,7 +150,7 @@
     </header>
     {% endif %}
 
-    <main class="{% if user.is_authenticated %}pt-28 pb-36{% endif %} container mx-auto px-4 max-w-lg">
+    <main id="main-content" class="{% if user.is_authenticated %}pt-28 pb-36{% endif %} container mx-auto px-4 max-w-lg">
         {% if messages %}
         <div class="fixed top-24 left-4 right-4 z-40 space-y-2">
             {% for message in messages %}
@@ -165,6 +202,22 @@
     </nav>
     {% endif %}
 
+    <script>
+        function coinRain(count = 5) {
+            const emojis = ['🪙', '💰', '✨', '⭐'];
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.className = 'coin-rain coin-rain-' + i;
+                el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                el.style.left = (10 + Math.random() * 80) + '%';
+                el.style.fontSize = (16 + Math.random() * 20) + 'px';
+                el.style.animationDuration = (1 + Math.random()) + 's';
+                el.style.animationDelay = (Math.random() * 0.3) + 's';
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 2500);
+            }
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script>
         const themeToggle = document.getElementById('theme-toggle');
