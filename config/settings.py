@@ -44,7 +44,7 @@ sentry_sdk.init(
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 if '' in ALLOWED_HOSTS:
     ALLOWED_HOSTS.remove('')
-ALLOWED_HOSTS += ['localhost', '127.0.0.1', '[::1]']
+ALLOWED_HOSTS += ['localhost', '127.0.0.1', '[::1]', 'testserver']
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -224,6 +224,10 @@ CACHES = {
         'KEY_PREFIX': 'gaintime',
     }
 }
+
+# Fallback vers LocMem si Redis indisponible
+if not os.environ.get('REDIS_URL'):
+    CACHES['default']['BACKEND'] = 'django.core.cache.backends.locmem.LocMemCache'
 
 # --- CHANNELS (WebSocket Chat) ---
 ASGI_APPLICATION = 'config.asgi.application'
