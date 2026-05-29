@@ -645,6 +645,10 @@ def check_badge_unlocks(user):
             user.save()
 
 
+def offline_view(request):
+    return render(request, 'core/offline.html')
+
+
 @login_required
 def gamification_view(request):
     user = request.user

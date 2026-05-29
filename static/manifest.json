@@ -3,15 +3,18 @@
     "short_name": "GainTime",
     "start_url": "/dashboard/",
     "display": "standalone",
-    "background_color": "#1e3a8a",
-    "theme_color": "#059669",
+    "background_color": "#0F172A",
+    "theme_color": "#0F172A",
     "description": "Gagnez de l'argent chaque jour avec GainTime au Cameroun.",
     "icons": [
         {
-            "src": "https://ui-avatars.com/api/?name=GT&background=059669&color=fff&size=512&font-size=0.45&bold=true",
+            "src": "https://ui-avatars.com/api/?name=GT&background=0F172A&color=fff&size=512&font-size=0.45&bold=true",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
         }
-    ]
+    ],
+    "categories": ["finance", "utilities"],
+    "lang": "fr-FR",
+    "orientation": "portrait"
 }

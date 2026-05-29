@@ -43,6 +43,9 @@ urlpatterns = [
     # Gamification
     path('gamification/', views.gamification_view, name='gamification'),
 
+    # PWA offline fallback
+    path('offline/', views.offline_view, name='offline'),
+
     # Chat live
     path('chat/', views.chat_view, name='chat'),
     
