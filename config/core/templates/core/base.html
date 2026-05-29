@@ -168,7 +168,7 @@
     {% if user.is_authenticated %}
     <!-- Bottom Floating Navigation -->
     <nav class="bottom-nav p-2">
-        <div class="grid {% if user.has_completed_survey %}grid-cols-6{% else %}grid-cols-5{% endif %} items-center gap-1">
+        <div class="grid {% if user.has_completed_survey %}grid-cols-7{% else %}grid-cols-6{% endif %} items-center gap-1">
             <a href="{% url 'dashboard' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'dashboard' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
                 <i class="fas fa-th-large text-xl mb-1"></i>
                 <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Accueil" %}</span>
@@ -183,6 +183,10 @@
                 <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Social" %}</span>
             </a>
             {% endif %}
+            <a href="{% url 'chat' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'chat' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
+                <i class="fas fa-comment-dots text-xl mb-1"></i>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Chat" %}</span>
+            </a>
             <a href="{% url 'mining' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'mining' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
                 <div class="relative">
                     <i class="fas fa-bolt text-xl mb-1"></i>
@@ -238,9 +242,9 @@
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js')
-                    .then(reg => console.log('Ready'))
-                    .catch(err => console.log('Fail', err));
+                navigator.serviceWorker.register('/static/core/js/service-worker.js')
+                    .then(reg => console.log('SW ready'))
+                    .catch(err => console.log('SW fail', err));
             });
         }
 

@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: scam
+      POSTGRES_USER: wends23
+      POSTGRES_PASSWORD: scam2024pass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wends23 -d scam"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
+      REDIS_URL: redis://redis:6379/1
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+
+  celery_worker:
+    build: .
+    command: celery -A config worker --loglevel=info
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
+      REDIS_URL: redis://redis:6379/1
+
+  celery_beat:
+    build: .
+    command: celery -A config beat --loglevel=info
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
+      REDIS_URL: redis://redis:6379/1
+
+  bot:
+    build: .
+    command: python manage.py telegram_bot
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:

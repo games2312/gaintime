@@ -397,3 +397,14 @@ class UserMissionProgress(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.mission.mission_type}: {self.progress}/{self.mission.target}"
+
+
+class PushSubscription(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='push_subscriptions')
+    endpoint = models.URLField(max_length=500)
+    auth_key = models.CharField(max_length=100, blank=True)
+    p256dh_key = models.CharField(max_length=100, blank=True)
+    subscribed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'endpoint')

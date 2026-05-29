@@ -1,0 +1,102 @@
+{% extends 'core/base.html' %}
+{% block title %}Chat en direct - GainTime{% endblock %}
+{% block content %}
+<div class="flex flex-col h-[calc(100vh-10rem)] fade-in-up">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-bold">Chat en direct</h1>
+        <span id="user-count" class="text-[10px] font-black text-muted bg-white/5 px-3 py-1 rounded-full">0 en ligne</span>
+    </div>
+
+    <div id="chat-messages" class="flex-1 overflow-y-auto space-y-2 p-3 glass-card mb-3">
+        <div class="text-center text-muted text-xs py-8">Connecté au chat...</div>
+    </div>
+
+    <form id="chat-form" class="flex gap-2" autocomplete="off">
+        {% csrf_token %}
+        <input type="text" id="chat-input" placeholder="Votre message..." maxlength="500" required
+               class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-primary-gold transition">
+        <button type="submit" class="gold-gradient text-white font-black text-xs px-6 py-3 rounded-xl hover:opacity-90 transition flex items-center gap-2">
+            <i class="fas fa-paper-plane"></i>
+            <span class="hidden sm:inline">Envoyer</span>
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+#chat-messages { scroll-behavior: smooth; }
+.msg-user { font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.msg-text { word-break: break-word; font-size: 13px; }
+.msg-time { font-size: 9px; opacity: 0.4; }
+</style>
+<script>
+(function () {
+    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = wsScheme + '://' + window.location.host + '/ws/chat/';
+    let socket, reconnectTimer;
+    const messagesEl = document.getElementById('chat-messages');
+    const formEl = document.getElementById('chat-form');
+    const inputEl = document.getElementById('chat-input');
+
+    function connect() {
+        socket = new WebSocket(wsUrl);
+        socket.onopen = () => {
+            console.log('Chat WS connecté');
+            if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+        };
+        socket.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'system') {
+                addSystemMessage(data.message);
+            } else if (data.type === 'message') {
+                addChatMessage(data.username, data.message, data.timestamp);
+            } else if (data.type === 'error') {
+                addSystemMessage('⚠ ' + data.message);
+            }
+        };
+        socket.onclose = () => {
+            console.log('Chat WS déconnecté, reconnexion dans 3s...');
+            reconnectTimer = setTimeout(connect, 3000);
+        };
+    }
+
+    function addSystemMessage(msg) {
+        const d = document.createElement('div');
+        d.className = 'text-center text-muted text-[10px] py-1';
+        d.textContent = msg;
+        messagesEl.appendChild(d);
+        scrollBottom();
+    }
+
+    function addChatMessage(username, message, timestamp) {
+        const t = timestamp ? new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+        const d = document.createElement('div');
+        d.className = 'flex flex-col';
+        d.innerHTML = '<span class="msg-user text-primary-gold">' + escapeHtml(username) + '</span>'
+            + '<span class="msg-text">' + escapeHtml(message) + '</span>'
+            + '<span class="msg-time">' + t + '</span>';
+        messagesEl.appendChild(d);
+        scrollBottom();
+    }
+
+    function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+    function escapeHtml(t) {
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+
+    formEl.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const msg = inputEl.value.trim();
+        if (!msg || !socket || socket.readyState !== WebSocket.OPEN) return;
+        socket.send(JSON.stringify({ message: msg }));
+        inputEl.value = '';
+    });
+
+    connect();
+})();
+</script>
+{% endblock %}

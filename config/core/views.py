@@ -563,6 +563,31 @@ def referral_program_view(request):
     })
 
 
+@login_required
+def gamification_view(request):
+    user = request.user
+    user.trust_score = compute_trust_score(user)
+    check_badge_unlocks(user)
+    user.save()
+
+    today = timezone.now().date()
+    earned_badges = UserBadge.objects.filter(user=user).select_related('badge')
+    missions = DailyMission.objects.filter(is_active=True)
+    mission_progress = UserMissionProgress.objects.filter(user=user, date=today).select_related('mission')
+
+    return render(request, 'core/gamification.html', {
+        'trust_score': user.trust_score,
+        'earned_badges': earned_badges,
+        'missions': missions,
+        'mission_progress': {mp.mission_id: mp for mp in mission_progress},
+    })
+
+
+@login_required
+def chat_view(request):
+    return render(request, 'core/chat.html')
+
+
 def compute_trust_score(user):
     score = 0
     now = timezone.now()

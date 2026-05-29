@@ -94,6 +94,16 @@
             <!-- Language Switcher Inline -->
             <div class="p-4 border-b border-white/5">
                 <p class="text-[9px] font-black text-muted uppercase tracking-[0.2em] mb-4">{% trans "Configuration" %}</p>
+
+                <!-- Notifications Push Toggle -->
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-xs font-bold">Notifications push</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="push-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-white/10 rounded-full peer peer-checked:bg-primary-gold after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                    </label>
+                </div>
+
                 <form action="{% url 'set_language' %}" method="post" class="relative">
                     {% csrf_token %}
                     <input name="next" type="hidden" value="{{ request.get_full_path }}">
@@ -129,4 +139,26 @@
         <p class="text-[10px] font-bold text-muted/40 uppercase tracking-[0.4em]">GainTime &copy; 2026 • v1.2.0</p>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'core/js/push-notifications.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async function () {
+    const toggle = document.getElementById('push-toggle');
+    if (!toggle) return;
+    try {
+        const res = await fetch('/api/push/settings/');
+        const data = await res.json();
+        toggle.checked = data.enabled;
+    } catch {}
+    toggle.addEventListener('change', async function () {
+        if (this.checked) {
+            await subscribeToPush('{{ VAPID_PUBLIC_KEY|default:"BCvS7wKz9QmR0xX3y5A8nE2gH4jK6lM8oP1rT3uV5wX7yZ9bC1dF3gH5iJ7kL9mN1p" }}');
+        } else {
+            await unsubscribeFromPush();
+        }
+    });
+});
+</script>
 {% endblock %}
