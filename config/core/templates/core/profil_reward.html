@@ -1,0 +1,132 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Profil - GainTime{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Profile Header Card -->
+    <div class="purple-gradient text-white rounded-[32px] p-8 shadow-purple relative overflow-hidden fade-in-up -mt-6">
+        <div class="absolute -right-12 -top-12 bg-white/10 w-48 h-48 rounded-full blur-3xl"></div>
+        <div class="relative z-10 text-center">
+            <div class="w-24 h-24 bg-white/20 backdrop-blur-md rounded-[2.5rem] mx-auto mb-6 p-1 border border-white/30 shadow-2xl relative overflow-hidden">
+                <div class="w-full h-full bg-white force-white rounded-[2rem] flex items-center justify-center">
+                    <span class="text-4xl font-black text-purple-700">{{ user.username|first|upper }}</span>
+                </div>
+                <div class="absolute bottom-2 right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+            </div>
+            <h1 class="text-3xl font-black tracking-tighter">{{ user.username }}</h1>
+            <p class="text-white/60 text-sm font-bold mt-1 tracking-widest">{{ user.phone_number }}</p>
+            
+            <div class="inline-flex items-center mt-6 bg-black/20 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-white/10 shadow-inner">
+                <i class="fas fa-crown text-primary-gold mr-3"></i>
+                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-primary-gold">{{ user.vip_level.name|default:"Gratuit" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Grid -->
+    <div class="grid grid-cols-3 gap-3 fade-in-up" style="animation-delay: 0.1s;">
+        <div class="glass-card p-4 text-center">
+            <p class="text-[8px] font-black text-muted uppercase tracking-widest mb-1">{% trans "Solde" %}</p>
+            <p class="text-xs font-black">{{ user.balance|floatformat:0 }} F</p>
+        </div>
+        <div class="glass-card p-4 text-center border-b-2 border-b-primary-gold">
+            <p class="text-[8px] font-black text-primary-gold uppercase tracking-widest mb-1">{% trans "Total" %}</p>
+            <p class="text-xs font-black text-primary-gold">{{ user.total_earnings|floatformat:0 }} F</p>
+        </div>
+        <div class="glass-card p-4 text-center">
+            <p class="text-[8px] font-black text-muted uppercase tracking-widest mb-1">{% trans "Team" %}</p>
+            <p class="text-xs font-black">{{ user.referrals.count }}</p>
+        </div>
+    </div>
+
+    <!-- Main Navigation Menu -->
+    <div class="glass-card overflow-hidden fade-in-up" style="animation-delay: 0.2s;">
+        <div class="p-3">
+            <a href="{% url 'team' %}" class="flex items-center p-4 rounded-2xl hover:bg-white/5 transition group">
+                <div class="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mr-4 group-hover:bg-purple-500 group-hover:text-white transition-all shadow-inner">
+                    <i class="fas fa-users-viewfinder text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-black uppercase tracking-tight">{% trans "Mon Équipe" %}</p>
+                    <p class="text-[10px] text-muted font-bold">{% trans "Gérez vos 3 niveaux de parrainage" %}</p>
+                </div>
+                <i class="fas fa-chevron-right text-muted text-xs"></i>
+            </a>
+
+            <a href="{% url 'vip_plans' %}" class="flex items-center p-4 rounded-2xl hover:bg-white/5 transition group">
+                <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mr-4 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-inner">
+                    <i class="fas fa-gem text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-black uppercase tracking-tight">{% trans "Mettre à niveau" %}</p>
+                    <p class="text-[10px] text-muted font-bold">{% trans "Augmentez vos gains quotidiens" %}</p>
+                </div>
+                <i class="fas fa-chevron-right text-muted text-xs"></i>
+            </a>
+
+            <a href="{% url 'support' %}" class="flex items-center p-4 rounded-2xl hover:bg-white/5 transition group">
+                <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mr-4 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-inner">
+                    <i class="fas fa-headset text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-black uppercase tracking-tight">{% trans "Support Client" %}</p>
+                    <p class="text-[10px] text-muted font-bold">{% trans "Une question ? Notre équipe est là" %}</p>
+                </div>
+                <i class="fas fa-chevron-right text-muted text-xs"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Administrative & Settings -->
+    <div class="glass-card overflow-hidden fade-in-up" style="animation-delay: 0.3s;">
+        <div class="p-3 space-y-1">
+            {% if user.is_staff %}
+            <a href="{% url 'admin_dashboard' %}" class="flex items-center p-4 rounded-2xl bg-red-500/5 hover:bg-red-500/10 transition group border border-red-500/10">
+                <div class="w-10 h-10 rounded-xl bg-red-500/20 text-red-500 flex items-center justify-center mr-4">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <p class="text-xs font-black uppercase text-red-500">{% trans "Administration" %}</p>
+            </a>
+            {% endif %}
+
+            <!-- Language Switcher Inline -->
+            <div class="p-4 border-b border-white/5">
+                <p class="text-[9px] font-black text-muted uppercase tracking-[0.2em] mb-4">{% trans "Configuration" %}</p>
+                <form action="{% url 'set_language' %}" method="post" class="relative">
+                    {% csrf_token %}
+                    <input name="next" type="hidden" value="{{ request.get_full_path }}">
+                    <select name="language" onchange="this.form.submit()" class="w-full bg-white/5 border border-white/10 text-xs font-black uppercase py-3 px-4 rounded-xl outline-none focus:border-primary-gold transition appearance-none">
+                        {% get_current_language as LANGUAGE_CODE %}
+                        {% get_available_languages as LANGUAGES %}
+                        {% get_language_info_list for LANGUAGES as languages %}
+                        {% for language in languages %}
+                            <option value="{{ language.code }}" {% if language.code == LANGUAGE_CODE %}selected{% endif %}>{{ language.name_local }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </form>
+            </div>
+
+            <a href="{% url 'logout' %}" class="flex items-center p-4 rounded-2xl hover:bg-red-500/10 transition text-red-400 group">
+                <div class="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center mr-4 group-hover:bg-red-500 group-hover:text-white transition-all">
+                    <i class="fas fa-power-off"></i>
+                </div>
+                <p class="text-xs font-black uppercase">{% trans "Déconnexion" %}</p>
+            </a>
+        </div>
+    </div>
+
+    <!-- Legal Links & Footer -->
+    <div class="text-center space-y-4 py-8">
+        <div class="flex justify-center space-x-6">
+            <a href="{% url 'cgu' %}" class="text-[9px] font-black text-muted uppercase tracking-widest hover:text-primary-gold transition">{% trans "Conditions" %}</a>
+            <a href="{% url 'privacy' %}" class="text-[9px] font-black text-muted uppercase tracking-widest hover:text-primary-gold transition">{% trans "Confidentialité" %}</a>
+        </div>
+        <p class="text-[10px] font-bold text-muted/40 uppercase tracking-[0.4em]">GainTime &copy; 2026 • v1.2.0</p>
+    </div>
+</div>
+{% endblock %}

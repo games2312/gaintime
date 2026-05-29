@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+{% load i18n %}
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GainTime{% endblock %}</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0F172A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=GT&background=0F172A&color=fff&size=512&font-size=0.45&bold=true">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-primary: #0F172A;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary-gold: #F59E0B;
+            --accent-purple: #8B5CF6;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+        }
+
+        .light-mode {
+            --bg-primary: #F8FAFC;
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --text-main: #0F172A;
+            --text-muted: #475569;
+        }
+
+        * { 
+            font-family: 'IBM Plex Sans', sans-serif; 
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body { 
+            background-color: var(--bg-primary); 
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+        }
+
+        .gold-gradient { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); }
+        .purple-gradient { background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); }
+        
+        .shadow-gold { box-shadow: 0 10px 20px -5px rgba(245, 158, 11, 0.3); }
+        .shadow-purple { box-shadow: 0 10px 20px -5px rgba(139, 92, 246, 0.3); }
+
+        /* Force overrides for light/dark consistency */
+        .dark-mode-force { color: #F8FAFC !important; }
+        
+        .bottom-nav { 
+            position: fixed; bottom: 1.5rem; left: 1rem; right: 1rem; 
+            z-index: 1000; 
+            background: var(--glass-bg); 
+            backdrop-filter: blur(20px); 
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in-up { animation: fadeInUp 0.5s ease-out both; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="no-scrollbar">
+    {% if user.is_authenticated %}
+    <!-- Modern Header -->
+    <header class="fixed top-4 left-4 right-4 z-50 glass-card p-3 flex justify-between items-center shadow-xl">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 gold-gradient rounded-xl flex items-center justify-center text-white font-bold shadow-gold">GT</div>
+            <div>
+                <p class="text-[10px] text-muted font-bold uppercase tracking-widest">{% trans "Membre" %}</p>
+                <p class="text-sm font-bold truncate max-w-[120px]">{{ user.username }}</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button id="theme-toggle" class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition">
+                <i class="fas fa-moon text-lg" id="theme-icon"></i>
+            </button>
+            <a href="{% url 'notifications' %}" class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition relative">
+                <i class="fas fa-bell text-lg"></i>
+                <div id="notif-badge" hx-get="{% url 'unread_notifications_count' %}" hx-trigger="every 30s" hx-swap="innerHTML">
+                </div>
+            </a>
+            <a href="{% url 'vip_plans' %}" class="gold-gradient text-white text-[10px] font-black px-4 py-2.5 rounded-xl shadow-gold uppercase tracking-tight active:scale-95 transition">
+                Upgrade
+            </a>
+        </div>
+    </header>
+    {% endif %}
+
+    <main class="{% if user.is_authenticated %}pt-28 pb-36{% endif %} container mx-auto px-4 max-w-lg">
+        {% if messages %}
+        <div class="fixed top-24 left-4 right-4 z-40 space-y-2">
+            {% for message in messages %}
+            <div class="glass-card p-4 text-sm font-bold flex items-center shadow-lg {% if message.tags == 'success' %}text-green-500{% else %}text-red-500{% endif %}">
+                <i class="fas {% if message.tags == 'success' %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %} mr-2"></i>
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    {% if user.is_authenticated %}
+    <!-- Bottom Floating Navigation -->
+    <nav class="bottom-nav p-2">
+        <div class="grid {% if user.has_completed_survey %}grid-cols-6{% else %}grid-cols-5{% endif %} items-center gap-1">
+            <a href="{% url 'dashboard' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'dashboard' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
+                <i class="fas fa-th-large text-xl mb-1"></i>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Accueil" %}</span>
+            </a>
+            <a href="{% url 'tasks' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'tasks' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
+                <i class="fas fa-tasks text-xl mb-1"></i>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Tâches" %}</span>
+            </a>
+            {% if user.has_completed_survey %}
+            <a href="{% url 'communaute' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'communaute' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
+                <i class="fas fa-users text-xl mb-1"></i>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Social" %}</span>
+            </a>
+            {% endif %}
+            <a href="{% url 'mining' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'mining' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
+                <div class="relative">
+                    <i class="fas fa-bolt text-xl mb-1"></i>
+                    {% if user.can_mine_now %}<span class="absolute -top-1 -right-1 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping"></span>{% endif %}
+                </div>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Minage" %}</span>
+            </a>
+            <a href="{% url 'wallet' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'wallet' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
+                <i class="fas fa-wallet text-xl mb-1"></i>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Cash" %}</span>
+            </a>
+            <a href="{% url 'profile' %}" class="flex flex-col items-center justify-center py-2 transition rounded-xl {% if request.resolver_match.url_name == 'profile' %}text-primary-gold bg-white/10{% else %}text-muted hover:text-white{% endif %}">
+                <i class="fas fa-user text-xl mb-1"></i>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">{% trans "Profil" %}</span>
+            </a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const body = document.body;
+
+        if (localStorage.getItem('theme') === 'light') {
+            body.classList.add('light-mode');
+            themeIcon?.classList.replace('fa-moon', 'fa-sun');
+        }
+
+        themeToggle?.addEventListener('click', () => {
+            body.classList.toggle('light-mode');
+            const isLight = body.classList.contains('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            themeIcon.classList.replace(isLight ? 'fa-moon' : 'fa-sun', isLight ? 'fa-sun' : 'fa-moon');
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('Ready'))
+                    .catch(err => console.log('Fail', err));
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if messages %}
+                {% for message in messages %}
+                    {% if message.tags == 'success' %}
+                        confetti({
+                            particleCount: 100,
+                            spread: 70,
+                            origin: { y: 0.6 },
+                            colors: ['#F59E0B', '#FBBF24', '#8B5CF6']
+                        });
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

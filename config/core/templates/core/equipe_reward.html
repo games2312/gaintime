@@ -1,0 +1,155 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Mon Réseau - GainTime{% endblock %}
+
+{% block extra_css %}
+<style>
+    .referral-gradient { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+    .code-display { font-family: 'Courier New', monospace; letter-spacing: 2px; }
+    .nav-tabs .active { border-bottom: 3px solid #7c3aed; color: #7c3aed; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Carte Code & Stats -->
+<section class="mb-8 mt-4">
+    <div class="referral-gradient rounded-2xl p-6 text-white shadow-lg">
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold mb-2">Mon Équipe</h2>
+            <p class="text-white text-opacity-80 text-sm">Gagnez sur 3 niveaux : 10% (Niv 1), 5% (Niv 2), 2% (Niv 3)</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-white/10 rounded-xl p-3 text-center backdrop-blur-sm border border-white/20">
+                <p class="text-[10px] uppercase opacity-70">Total Membres</p>
+                <p class="text-xl font-bold">{{ total_referrals }}</p>
+            </div>
+            <div class="bg-white/10 rounded-xl p-3 text-center backdrop-blur-sm border border-white/20">
+                <p class="text-[10px] uppercase opacity-70">Gains Équipe</p>
+                <p class="text-xl font-bold">{{ total_commissions }} F</p>
+            </div>
+        </div>
+
+        <div class="bg-black bg-opacity-20 rounded-xl p-4 mb-6 text-center border border-white/10">
+            <p class="text-xs text-white text-opacity-60 mb-1">Lien de parrainage</p>
+            <div class="text-[10px] truncate opacity-80 mb-2 font-mono" id="ref-link">
+                {{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}
+            </div>
+            <div class="code-display text-3xl font-bold tracking-widest text-white">
+                {{ user.invitation_code }}
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="copyLink()" class="bg-white text-purple-700 font-bold py-3 rounded-xl shadow hover:bg-gray-100 transition active:scale-95">
+                <i class="fas fa-copy mr-2"></i> COPIER
+            </button>
+            <button onclick="window.open('https://wa.me/?text=Gagnez de l\'argent chaque jour avec GainTime au Cameroun ! Rejoignez-moi ici : {{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}', '_blank')" class="bg-green-500 text-white font-bold py-3 rounded-xl shadow hover:bg-green-600 transition active:scale-95">
+                <i class="fab fa-whatsapp mr-2 text-lg"></i> PARTAGER
+            </button>
+        </div>
+    </div>
+</section>
+
+<script>
+    function copyLink() {
+        const link = "{{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}";
+        navigator.clipboard.writeText(link);
+        alert("Lien complet copié !");
+    }
+</script>
+
+<!-- Liste Filleuls avec Onglets -->
+<section x-data="{ tab: 'l1' }">
+    <div class="flex border-b border-gray-200 mb-4 nav-tabs">
+        <button @click="tab = 'l1'" :class="tab === 'l1' ? 'active' : 'text-gray-500'" class="flex-1 py-3 text-sm font-bold transition">
+            Niveau 1 ({{ referrals_l1.count }})
+        </button>
+        <button @click="tab = 'l2'" :class="tab === 'l2' ? 'active' : 'text-gray-500'" class="flex-1 py-3 text-sm font-bold transition">
+            Niveau 2 ({{ referrals_l2.count }})
+        </button>
+        <button @click="tab = 'l3'" :class="tab === 'l3' ? 'active' : 'text-gray-500'" class="flex-1 py-3 text-sm font-bold transition">
+            Niveau 3 ({{ referrals_l3.count }})
+        </button>
+    </div>
+    
+    <!-- Niveau 1 -->
+    <div x-show="tab === 'l1'" class="space-y-3">
+        {% for ref in referrals_l1 %}
+        <div class="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold mr-3">
+                    {{ ref.username|slice:":1"|upper }}
+                </div>
+                <div>
+                    <p class="font-bold text-gray-800">{{ ref.username }}</p>
+                    <p class="text-[10px] text-gray-400">Inscrit le {{ ref.date_joined|date:"d/m/y" }}</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-xs font-bold text-green-600">+{{ ref.earned_for_me|default:0|floatformat:0 }} F</p>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {% if ref.vip_level and ref.vip_level.price > 0 %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                    {{ ref.vip_level.name|default:"Gratuit" }}
+                </span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-gray-400">Aucun membre au niveau 1</div>
+        {% endfor %}
+    </div>
+
+    <!-- Niveau 2 -->
+    <div x-show="tab === 'l2'" class="space-y-3" style="display: none;">
+        {% for ref in referrals_l2 %}
+        <div class="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3">
+                    {{ ref.username|slice:":1"|upper }}
+                </div>
+                <div>
+                    <p class="font-bold text-gray-800">{{ ref.username }}</p>
+                    <p class="text-[10px] text-gray-400">Via {{ ref.referred_by.username }}</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-xs font-bold text-green-600">+{{ ref.earned_for_me|default:0|floatformat:0 }} F</p>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {% if ref.vip_level and ref.vip_level.price > 0 %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                    {{ ref.vip_level.name|default:"Gratuit" }}
+                </span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-gray-400">Aucun membre au niveau 2</div>
+        {% endfor %}
+    </div>
+
+    <!-- Niveau 3 -->
+    <div x-show="tab === 'l3'" class="space-y-3" style="display: none;">
+        {% for ref in referrals_l3 %}
+        <div class="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold mr-3">
+                    {{ ref.username|slice:":1"|upper }}
+                </div>
+                <div>
+                    <p class="font-bold text-gray-800">{{ ref.username }}</p>
+                    <p class="text-[10px] text-gray-400">Via {{ ref.referred_by.username }}</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-xs font-bold text-green-600">+{{ ref.earned_for_me|default:0|floatformat:0 }} F</p>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {% if ref.vip_level and ref.vip_level.price > 0 %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                    {{ ref.vip_level.name|default:"Gratuit" }}
+                </span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-gray-400">Aucun membre au niveau 3</div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Alpine.js pour les onglets si pas déjà présent dans base.html -->
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+{% endblock %}

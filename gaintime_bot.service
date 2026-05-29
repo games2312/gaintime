@@ -1,0 +1,16 @@
+[Unit]
+Description=Bot Telegram GainTime Verification
+After=network.target
+
+[Service]
+User=wends23
+WorkingDirectory=/home/wends23/Documents/scam
+EnvironmentFile=/home/wends23/Documents/scam/.env
+ExecStart=/home/wends23/Documents/scam/reward/bin/python3 manage.py telegram_bot
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/wends23/Documents/scam/bot.log
+StandardError=append:/home/wends23/Documents/scam/bot.log
+
+[Install]
+WantedBy=multi-user.target

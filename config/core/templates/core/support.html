@@ -1,0 +1,61 @@
+{% extends 'core/base.html' %}
+{% block title %}Support Technique - GainTime{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-800">Support Technique</h1>
+    <p class="text-sm text-gray-500">Une question ou un problème ? Notre équipe vous répond sous 24h.</p>
+</div>
+
+<!-- Formulaire Nouveau Ticket -->
+<div class="bg-white rounded-2xl p-6 shadow-soft mb-8">
+    <h2 class="text-lg font-bold text-gray-800 mb-4">Ouvrir un ticket</h2>
+    <form method="POST" class="space-y-4">
+        {% csrf_token %}
+        <div>
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Sujet</label>
+            <input type="text" name="subject" required placeholder="Ex: Problème de dépôt, Question VIP..."
+                   class="w-full px-4 py-3 rounded-xl border border-gray-100 focus:ring-2 focus:ring-purple-500 outline-none transition bg-gray-50/50">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Message détaillé</label>
+            <textarea name="message" rows="4" required placeholder="Décrivez votre problème ici..."
+                      class="w-full px-4 py-3 rounded-xl border border-gray-100 focus:ring-2 focus:ring-purple-500 outline-none transition bg-gray-50/50"></textarea>
+        </div>
+        <button type="submit" class="w-full bg-purple-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-purple-700 transition active:scale-95">
+            ENVOYER LE TICKET
+        </button>
+    </form>
+</div>
+
+<!-- Historique des tickets -->
+<div>
+    <h2 class="text-lg font-bold text-gray-800 mb-4">Mes tickets récents</h2>
+    <div class="space-y-4">
+        {% for ticket in tickets %}
+        <div class="bg-white rounded-2xl p-5 shadow-sm border-l-4 {% if ticket.status == 'OPEN' %}border-blue-500{% elif ticket.status == 'PENDING' %}border-yellow-500{% else %}border-green-500{% endif %}">
+            <div class="flex justify-between items-start mb-2">
+                <h3 class="font-bold text-gray-800">{{ ticket.subject }}</h3>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full 
+                    {% if ticket.status == 'OPEN' %}bg-blue-100 text-blue-700{% elif ticket.status == 'PENDING' %}bg-yellow-100 text-yellow-700{% else %}bg-green-100 text-green-700{% endif %}">
+                    {{ ticket.get_status_display }}
+                </span>
+            </div>
+            <p class="text-sm text-gray-600 mb-3">{{ ticket.message }}</p>
+            <p class="text-[10px] text-gray-400 mb-3">Posté le {{ ticket.created_at|date:"d/m/Y à H:i" }}</p>
+            
+            {% if ticket.admin_reply %}
+            <div class="mt-4 p-4 bg-purple-50 rounded-xl border border-purple-100">
+                <p class="text-[10px] font-bold text-purple-600 uppercase mb-1">Réponse de l'Admin :</p>
+                <p class="text-sm text-gray-800">{{ ticket.admin_reply }}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="text-center py-10 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+            <i class="fas fa-comment-slash text-3xl text-gray-300 mb-2"></i>
+            <p class="text-sm text-gray-400">Aucun ticket ouvert pour le moment.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

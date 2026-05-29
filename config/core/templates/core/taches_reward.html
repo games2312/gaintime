@@ -1,0 +1,179 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Missions - GainTime{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- VIP Progress Header -->
+    <div class="glass-card p-6 border-l-4 border-l-primary-gold relative overflow-hidden fade-in-up">
+        <div class="absolute -right-4 -top-4 w-20 h-20 gold-gradient rounded-full opacity-10 blur-xl"></div>
+        <div class="flex justify-between items-center relative z-10">
+            <div>
+                <p class="text-[10px] text-muted font-black uppercase tracking-widest mb-1">{% trans "Statut Actuel" %}</p>
+                <p class="text-xl font-black text-primary-gold">{{ user_level.name }}</p>
+                <p class="text-xs font-bold text-muted mt-1">{{ user_level.task_reward_rate }} F / {% trans "mission" %}</p>
+            </div>
+            <div class="text-right">
+                <div class="inline-flex flex-col items-end">
+                    <p class="text-[10px] text-muted font-black uppercase mb-1">{% trans "Quota Quotidien" %}</p>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl font-black">{{ tasks_done_count }}</span>
+                        <span class="text-muted text-sm">/</span>
+                        <span class="text-sm font-bold text-muted">{{ daily_limit }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div class="h-full gold-gradient shadow-gold" style="width: {% if daily_limit > 0 %}{{ tasks_done_count|add:0|divide:daily_limit|multiply:100 }}{% else %}0{% endif %}%;"></div>
+        </div>
+    </div>
+
+    <!-- Task List -->
+    <div class="space-y-4">
+        {% for task in tasks %}
+        <div class="glass-card p-5 fade-in-up {% if task.id in completed_task_ids %}opacity-60 bg-white/5{% endif %}" style="animation-delay: {{ forloop.counter|multiply:0.05 }}s;">
+            <div class="flex items-center mb-4">
+                <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-white mr-4 shadow-xl 
+                    {% if task.platform == 'youtube' %}bg-[#FF0000]
+                    {% elif task.platform == 'facebook' %}bg-[#1877F2]
+                    {% elif task.platform == 'tiktok' %}bg-black border border-white/20
+                    {% else %}purple-gradient{% endif %}">
+                    <i class="fab fa-{{ task.platform }} text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-black text-sm uppercase tracking-tight">{{ task.title }}</h3>
+                        <div class="bg-green-500/20 px-2 py-1 rounded-lg">
+                            <span class="text-green-400 font-black text-xs">+{{ user_level.task_reward_rate }} F</span>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-muted font-medium mt-1 leading-relaxed">{{ task.description }}</p>
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center pt-4 border-t border-white/5">
+                <span class="text-[9px] font-black uppercase tracking-widest text-muted flex items-center">
+                    <span class="w-1.5 h-1.5 rounded-full mr-2 
+                        {% if task.category == 'trading' %}bg-blue-400
+                        {% elif task.category == 'dropshipping' %}bg-purple-400
+                        {% else %}bg-primary-gold{% endif %}"></span>
+                    {{ task.get_category_display }}
+                </span>
+
+                {% if task.id in completed_task_ids %}
+                    <div class="flex items-center text-green-400 font-black text-[10px] uppercase tracking-tighter">
+                        <i class="fas fa-check-double mr-1.5"></i> {% trans "Terminé" %}
+                    </div>
+                {% else %}
+                    {% if task.is_automatic %}
+                        <a href="{% url 'start_auto_task' task.id %}" class="purple-gradient text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-purple btn-hover transition-all">
+                            <i class="fas fa-stopwatch mr-1.5"></i> {{ task.duration_seconds }}s
+                        </a>
+                    {% else %}
+                        <button onclick="openTaskModal('{{ task.id }}', '{{ task.title }}', '{{ task.link }}', '{{ task.requires_link_proof }}')" class="gold-gradient text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-gold btn-hover transition-all">
+                            {% trans "Action" %}
+                        </button>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="glass-card p-12 text-center">
+            <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+                <i class="fas fa-box-open text-3xl text-muted"></i>
+            </div>
+            <p class="text-muted font-bold text-sm">{% trans "Aucune mission disponible pour le moment." %}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modern Task Modal -->
+<div id="taskModal" class="fixed inset-0 bg-black/90 hidden z-[2000] flex items-center justify-center p-6 backdrop-blur-xl">
+    <div class="glass-card w-full max-w-sm overflow-hidden border-white/20">
+        <div class="gold-gradient p-10 text-center text-white relative">
+            <div class="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/30 rotate-12">
+                <i class="fas fa-external-link-alt text-3xl"></i>
+            </div>
+            <h2 id="modalTitle" class="text-2xl font-black tracking-tighter uppercase"></h2>
+        </div>
+        
+        <div class="p-8 space-y-6">
+            <p class="text-white/70 text-sm text-center font-medium">
+                {% trans "Cliquez sur le bouton ci-dessous, effectuez l'action demandée, puis revenez ici pour envoyer votre preuve." %}
+            </p>
+            
+            <a id="modalLink" href="#" target="_blank" onclick="showValidationStep()" class="block w-full bg-white force-white-btn text-primary-gold py-4 rounded-2xl font-black shadow-xl text-center active:scale-95 transition-all uppercase tracking-widest text-xs">
+                {% trans "Ouvrir le lien" %}
+            </a>
+            
+            <div id="validationStep" class="hidden space-y-6 animate-fade-in">
+                <form id="claimForm" method="POST" action="" enctype="multipart/form-data" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    <div id="linkProofContainer" class="hidden">
+                        <label class="block text-[10px] font-black text-muted uppercase tracking-widest mb-2">{% trans "Lien de votre profil" %}</label>
+                        <input type="url" name="proof_link" placeholder="https://..." 
+                            class="w-full bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:border-primary-gold outline-none transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-muted uppercase tracking-widest mb-3">{% trans "Preuve Capture" %}</label>
+                        <div class="relative">
+                            <input type="file" name="screenshot" id="screenshot-input" accept="image/*" required class="hidden">
+                            <label for="screenshot-input" class="w-full bg-white/5 border border-dashed border-white/20 px-4 py-8 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition">
+                                <i class="fas fa-cloud-upload text-primary-gold text-2xl mb-2"></i>
+                                <span class="text-xs text-muted font-bold" id="file-name">{% trans "Cliquez pour uploader" %}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full purple-gradient text-white py-4 rounded-2xl font-black shadow-purple active:scale-95 transition-all uppercase tracking-widest text-xs">
+                        {% trans "Valider la mission" %}
+                    </button>
+                </form>
+            </div>
+            
+            <button onclick="closeTaskModal()" class="w-full text-muted font-black text-[10px] uppercase tracking-[0.2em] hover:text-white transition">
+                {% trans "Annuler" %}
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function openTaskModal(id, title, link, requiresLink) {
+        document.getElementById('modalTitle').innerText = title;
+        document.getElementById('modalLink').href = link;
+        document.getElementById('claimForm').action = "/complete-task/" + id + "/";
+        
+        const linkContainer = document.getElementById('linkProofContainer');
+        if (requiresLink === 'True') linkContainer.classList.remove('hidden');
+        else linkContainer.classList.add('hidden');
+        
+        document.getElementById('taskModal').classList.remove('hidden');
+    }
+
+    function showValidationStep() {
+        document.getElementById('validationStep').classList.remove('hidden');
+        document.getElementById('modalLink').classList.add('hidden');
+    }
+
+    function closeTaskModal() {
+        document.getElementById('taskModal').classList.add('hidden');
+        document.getElementById('validationStep').classList.add('hidden');
+        document.getElementById('modalLink').classList.remove('hidden');
+    }
+
+    document.getElementById('screenshot-input')?.addEventListener('change', function(e) {
+        if(e.target.files[0]) {
+            document.getElementById('file-name').innerText = e.target.files[0].name;
+            document.getElementById('file-name').classList.add('text-primary-gold');
+        }
+    });
+</script>
+{% endblock %}

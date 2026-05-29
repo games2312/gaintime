@@ -8,3 +8,17 @@ staticfiles/
 media/
 django.log
 .DS_Store
+*.sqlite3
+*.pot
+*.po
+*.mo
+__pycache__
+*.egg-info/
+dist/
+build/
+.eggs/
+*.db
+config/core/migrations/*.pyc
+*.key
+*.pem
+*.cert

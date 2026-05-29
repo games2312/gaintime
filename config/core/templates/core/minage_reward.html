@@ -1,0 +1,115 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Mining Center - GainTime{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Main Mining Card -->
+    <div class="glass-card p-8 text-center relative overflow-hidden fade-in-up">
+        <div class="absolute -right-4 -top-4 w-32 h-32 purple-gradient opacity-10 blur-3xl"></div>
+        <div class="absolute -left-4 -bottom-4 w-32 h-32 gold-gradient opacity-10 blur-3xl"></div>
+        
+        <div class="relative w-64 h-64 mx-auto mb-10">
+            <!-- Background Glow -->
+            <div class="absolute inset-0 rounded-full bg-white/5 animate-pulse scale-105"></div>
+            
+            <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="46" stroke="rgba(255,255,255,0.05)" stroke-width="4" fill="transparent" />
+                <circle id="progress-circle" cx="50" cy="50" r="46" stroke="var(--primary-gold)" stroke-width="4" 
+                        fill="transparent" stroke-dasharray="289" stroke-dashoffset="289" 
+                        stroke-linecap="round" class="transition-all duration-1000 ease-linear shadow-gold" />
+            </svg>
+            
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                {% if active_session %}
+                    <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 border border-white/10">
+                        <i class="fas fa-bolt-lightning text-3xl text-yellow-400 animate-pulse"></i>
+                    </div>
+                    <p class="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-1">{% trans "Temps restant" %}</p>
+                    <p id="mining-timer" class="text-4xl font-black tabular-nums tracking-tighter">00:00:00</p>
+                {% elif mining_completed %}
+                    <div class="w-20 h-20 gold-gradient rounded-[2.5rem] flex items-center justify-center mb-4 shadow-gold animate-bounce">
+                        <i class="fas fa-gem text-3xl text-white"></i>
+                    </div>
+                    <p class="text-xl font-black text-primary-gold uppercase">{% trans "Terminé !" %}</p>
+                {% else %}
+                    <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 border border-white/10">
+                        <i class="fas fa-power-off text-3xl text-muted"></i>
+                    </div>
+                    <p class="text-xl font-black text-muted uppercase tracking-widest">{% trans "Prêt" %}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="relative z-10">
+            {% if active_session %}
+                <button disabled class="w-full py-5 bg-white/5 text-muted rounded-2xl font-black uppercase tracking-widest border border-white/5">
+                    {% trans "Minage en cours..." %}
+                </button>
+            {% elif mining_completed %}
+                <form method="POST" action="{% url 'claim_mining' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="gold-gradient w-full py-5 rounded-2xl text-white font-black text-lg shadow-gold active:scale-95 transition animate-pulse tracking-widest uppercase">
+                        {% trans "Réclamer mes gains" %}
+                    </button>
+                </form>
+            {% else %}
+                <form method="POST" action="{% url 'start_mining' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="purple-gradient w-full py-5 rounded-2xl text-white font-black text-lg shadow-purple active:scale-95 transition tracking-widest uppercase">
+                        {% trans "Démarrer (12H)" %}
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Mining Stats Grid -->
+    <div class="grid grid-cols-2 gap-4 fade-in-up" style="animation-delay: 0.1s;">
+        <div class="glass-card p-6 flex flex-col items-center justify-center border-b-2 border-b-primary-gold">
+            <p class="text-[9px] font-black text-muted uppercase tracking-widest mb-2">{% trans "Gain / Session" %}</p>
+            <p class="text-xl font-black">{{ user.vip_level.daily_mining_reward|default:"25" }} <span class="text-xs opacity-40">F</span></p>
+        </div>
+        <div class="glass-card p-6 flex flex-col items-center justify-center border-b-2 border-b-accent-purple">
+            <p class="text-[9px] font-black text-muted uppercase tracking-widest mb-2">{% trans "Niveau" %}</p>
+            <p class="text-xl font-black text-accent-purple uppercase tracking-tight">{{ user.vip_level.name|default:"Gratuit" }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    {% if active_session and remaining_seconds > 0 %}
+    let remainingSeconds = {{ remaining_seconds|default:0 }};
+    const totalDuration = 12 * 3600;
+    const circle = document.getElementById('progress-circle');
+    const circumference = 2 * Math.PI * 46;
+
+    function updateTimer() {
+        if (remainingSeconds <= 0) { location.reload(); return; }
+        remainingSeconds--;
+        
+        let h = Math.floor(remainingSeconds / 3600);
+        let m = Math.floor((remainingSeconds % 3600) / 60);
+        let s = remainingSeconds % 60;
+        
+        const timerEl = document.getElementById("mining-timer");
+        if (timerEl) {
+            timerEl.innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }
+        
+        let progress = ((totalDuration - remainingSeconds) / totalDuration);
+        if (circle) {
+            circle.style.strokeDashoffset = circumference - (progress * circumference);
+        }
+    }
+    
+    if (remainingSeconds > 0) {
+        setInterval(updateTimer, 1000); 
+        updateTimer();
+    }
+    {% endif %}
+</script>
+{% endblock %}
