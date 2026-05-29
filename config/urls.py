@@ -19,6 +19,7 @@ from django.shortcuts import render
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 def handler404(request, exception):
     return render(request, 'core/404.html', status=404)
@@ -32,6 +33,9 @@ def handler500(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('i18n/', include('django.conf.urls.i18n')),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger'),
+    path('api/v1/', include('core.api_urls')),
     path('', include('core.urls')),
 ]
 

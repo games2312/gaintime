@@ -95,6 +95,7 @@ class CustomUser(AbstractUser):
 
     # Anti-fraude parrainage
     has_triggered_referral_bonus = models.BooleanField(default=False, verbose_name="A déjà généré un bonus parrain")
+    device_fingerprint = models.CharField(max_length=128, blank=True, null=True, db_index=True, verbose_name="Empreinte appareil")
 
     # Bonus Quotidien
     last_check_in = models.DateField(null=True, blank=True, verbose_name="Dernier Check-in")
@@ -133,6 +134,13 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return f"{self.username} ({self.vip_level.name if self.vip_level else 'Gratuit'})"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['registration_ip', 'last_ip']),
+            models.Index(fields=['referred_by']),
+            models.Index(fields=['device_fingerprint']),
+        ]
 
 class MiningSession(models.Model):
     DURATION_HOURS = 12
@@ -272,6 +280,13 @@ class Transaction(models.Model):
     proof_image = models.FileField(upload_to='deposits/proofs/', null=True, blank=True, verbose_name="Preuve de dépôt")
     description = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'transaction_type', 'status', 'created_at']),
+            models.Index(fields=['created_at']),
+        ]
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.get_transaction_type_display()} - {self.amount}"

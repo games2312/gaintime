@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+
 import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -31,6 +32,14 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-change-me
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+
+import sentry_sdk
+sentry_sdk.init(
+    dsn=os.environ.get('SENTRY_DSN', ''),
+    environment='production' if not DEBUG else 'development',
+    traces_sample_rate=0.2,
+    send_default_pii=False,
+)
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 if '' in ALLOWED_HOSTS:
@@ -75,6 +84,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
+    'drf_spectacular',
+
     'core',
 ]
 
@@ -100,6 +112,22 @@ LANGUAGES = [
     ('fr', _('Français')),
     ('en', _('English')),
 ]
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'GainTime API',
+    'DESCRIPTION': 'API de la plateforme de micro-revenus GainTime',
+    'VERSION': '1.0.0',
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+}
 
 ROOT_URLCONF = 'config.urls'
 
@@ -184,6 +212,44 @@ else:
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# --- CACHE REDIS ---
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+        'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'},
+        'KEY_PREFIX': 'gaintime',
+    }
+}
+
+# --- CELERY ---
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULE = {
+    'vip-expiry-check': {
+        'task': 'core.tasks.check_vip_expirations',
+        'schedule': 3600,
+    },
+    'daily-report-8am': {
+        'task': 'core.tasks.send_daily_report',
+        'schedule': 28800,
+    },
+    'fraud-detection-4am': {
+        'task': 'core.tasks.detect_fraud',
+        'schedule': 86400,
+    },
+    'media-cleanup': {
+        'task': 'core.tasks.cleanup_media_files',
+        'schedule': 86400,
+    },
+    'inactive-reminder': {
+        'task': 'core.tasks.remind_inactive_users',
+        'schedule': 86400,
+    },
+}
 
 # --- LOGGING ---
 LOGGING = {

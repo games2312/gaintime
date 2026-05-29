@@ -1,5 +1,4 @@
 import csv
-import hashlib
 import json
 import logging
 import random
@@ -24,7 +23,7 @@ from .models import (
     CustomUser, DepositMethod, FAQ, MiningSession, Notification,
     SupportTicket, Task, Transaction, UserTaskCompletion, VIPLevel,
 )
-from .utils import get_client_ip
+from .utils import compute_phash, get_client_ip, hamming_distance
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,8 @@ def register_view(request):
             user = form.save(commit=False)
             user.registration_ip = client_ip
             user.last_ip = client_ip
-            
+            user.device_fingerprint = request.POST.get('device_fingerprint', '')[:128]
+
             user.otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
             user.save()
             
@@ -153,6 +153,9 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             user.last_ip = get_client_ip(request)
+            fingerprint = request.POST.get('device_fingerprint', '')
+            if fingerprint and not user.device_fingerprint:
+                user.device_fingerprint = fingerprint[:128]
             user.save()
             login(request, user)
             return redirect('dashboard')
@@ -605,21 +608,23 @@ def start_mining(request):
         else:
             MiningSession.objects.create(user=request.user)
             if not request.user.has_triggered_referral_bonus and request.user.referred_by:
-                referrer = request.user.referred_by
-                if referrer.vip_level and referrer.vip_level.price > 0:
-                    bonus = referrer.vip_level.referral_reward
-                    referrer.balance += bonus
-                    # On ajoute un tour de roue gratuit
-                    referrer.free_spins += 1
-                    referrer.save()
-                    Transaction.objects.create(
-                        user=referrer, 
-                        from_user=request.user,
-                        amount=bonus, 
-                        transaction_type='REFERRAL_BONUS', 
-                        status='COMPLETED', 
-                        description=f"Bonus invitation: {request.user.username} (+1 tour de roue)"
-                    )
+                now = timezone.now()
+                hours_since_reg = (now - request.user.date_joined).total_seconds() / 3600
+                if hours_since_reg >= 24:
+                    referrer = request.user.referred_by
+                    if referrer.vip_level and referrer.vip_level.price > 0:
+                        bonus = referrer.vip_level.referral_reward
+                        referrer.balance += bonus
+                        referrer.free_spins += 1
+                        referrer.save()
+                        Transaction.objects.create(
+                            user=referrer, 
+                            from_user=request.user,
+                            amount=bonus, 
+                            transaction_type='REFERRAL_BONUS', 
+                            status='COMPLETED', 
+                            description=f"Bonus invitation: {request.user.username} (+1 tour de roue)"
+                        )
                 request.user.has_triggered_referral_bonus = True
                 request.user.save()
             messages.success(request, "Minage lancé !")
@@ -667,16 +672,16 @@ def complete_task(request, task_id):
         elif screenshot.size > 5 * 1024 * 1024:
             messages.error(request, "Fichier trop volumineux. Maximum 5 Mo.")
         else:
-            hasher = hashlib.md5()
-            for chunk in screenshot.chunks():
-                hasher.update(chunk)
-            img_hash = hasher.hexdigest()
+            img_hash = compute_phash(screenshot)
 
-            # Vérification si ce hash existe déjà (toutes tâches confondues pour cet utilisateur ou globalement)
-            # On vérifie globalement pour éviter qu'un utilisateur utilise l'image d'un autre
-            if UserTaskCompletion.objects.filter(image_hash=img_hash).exists():
-                messages.error(request, "Cette capture d'écran a déjà été utilisée pour une tâche.")
-                return redirect('tasks')
+            existing_hashes = UserTaskCompletion.objects.exclude(
+                image_hash__isnull=True
+            ).exclude(image_hash='').values_list('image_hash', flat=True)
+
+            for existing in existing_hashes:
+                if len(existing) == 16 and hamming_distance(img_hash, existing) <= 10:
+                    messages.error(request, "Cette capture est trop similaire à une preuve déjà soumise.")
+                    return redirect('tasks')
 
             UserTaskCompletion.objects.create(
                 user=request.user, 
