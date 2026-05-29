@@ -1,0 +1,51 @@
+{% extends 'core/base.html' %}
+{% block title %}Succès - GainTime{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in-up">
+    <h1 class="text-2xl font-bold">Succès & Missions</h1>
+
+    <div class="glass-card p-5 text-center">
+        <p class="text-xs text-muted mb-1">Score de confiance</p>
+        <div class="text-4xl font-black gold-gradient text-transparent bg-clip-text">{{ trust_score }}/100</div>
+        <div class="w-full bg-white/10 rounded-full h-2 mt-2">
+            <div class="gold-gradient h-2 rounded-full" style="width: {{ trust_score }}%"></div>
+        </div>
+    </div>
+
+    <h2 class="font-bold text-lg mt-6">Badges</h2>
+    <div class="grid grid-cols-3 gap-3">
+        {% for ub in earned_badges %}
+        <div class="glass-card p-3 text-center">
+            <i class="fas {{ ub.badge.icon }} text-2xl gold-gradient text-transparent bg-clip-text"></i>
+            <p class="text-xs font-bold mt-1">{{ ub.badge.name }}</p>
+            <p class="text-[8px] text-muted">{{ ub.earned_at|date:"d/m/Y" }}</p>
+        </div>
+        {% empty %}
+        <p class="text-muted text-xs col-span-3 text-center py-4">Aucun badge pour le moment.</p>
+        {% endfor %}
+    </div>
+
+    <h2 class="font-bold text-lg mt-6">Missions du jour</h2>
+    <div class="space-y-3">
+        {% for mission in missions %}
+        {% with progress=mission_progress|dict_key:mission.id %}
+        <div class="glass-card p-4">
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <p class="font-bold text-sm">{{ mission.description|default:mission.get_mission_type_display }}</p>
+                    <p class="text-xs text-muted">Objectif: {{ mission.target }}</p>
+                </div>
+                <span class="gold-gradient text-white text-xs font-bold px-2 py-1 rounded-full">{{ mission.reward }} F</span>
+            </div>
+            <div class="w-full bg-white/10 rounded-full h-1.5">
+                <div class="gold-gradient h-1.5 rounded-full" style="width: {{ progress|default:0 }}%"></div>
+            </div>
+            <p class="text-xs text-muted mt-1">{{ progress.progress|default:0 }}/{{ mission.target }}</p>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <p class="text-muted text-xs text-center py-4">Aucune mission aujourd'hui.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

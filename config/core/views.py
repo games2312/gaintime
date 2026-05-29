@@ -20,8 +20,9 @@ from django_ratelimit.decorators import ratelimit
 
 from .forms import RegisterForm, LoginForm, TaskForm, VIPLevelForm
 from .models import (
-    Boost, CustomUser, DepositMethod, FAQ, MiningSession, Notification,
-    SupportTicket, Task, Transaction, UserTaskCompletion, VIPLevel,
+    Badge, Boost, CustomUser, DailyMission, DepositMethod, FAQ,
+    MiningSession, Notification, SupportTicket, Task, Transaction,
+    UserBadge, UserMissionProgress, UserTaskCompletion, VIPLevel,
 )
 from .utils import compute_phash, get_client_ip, hamming_distance
 
@@ -559,6 +560,83 @@ def referral_program_view(request):
         'tiers': tiers,
         'current_tier': request.user.referral_tier,
         'total_referrals': request.user.total_referrals,
+    })
+
+
+def compute_trust_score(user):
+    score = 0
+    now = timezone.now()
+    days_active = (now - user.date_joined).days if user.date_joined else 0
+    score += min(days_active * 5, 30)
+    tasks_ok = UserTaskCompletion.objects.filter(user=user, status='APPROVED').count()
+    score += tasks_ok * 2
+    deposits = Transaction.objects.filter(user=user, transaction_type='DEPOSIT', status='COMPLETED').aggregate(
+        total=Sum('amount'))['total'] or 0
+    score += min(int(deposits / 1000) * 10, 40)
+    referrals_count = CustomUser.objects.filter(referred_by=user).count()
+    score += referrals_count * 15
+    if user.is_phone_verified:
+        score += 25
+    if user.vip_level and user.vip_level.price > 0:
+        score += 20
+    if user.is_active is False:
+        score = 0
+    return min(score, 100)
+
+
+def check_badge_unlocks(user):
+    now = timezone.now()
+    days_active = (now - user.date_joined).days if user.date_joined else 0
+    tasks_ok = UserTaskCompletion.objects.filter(user=user, status='APPROVED').count()
+    referrals_count = CustomUser.objects.filter(referred_by=user).count()
+
+    badges = Badge.objects.filter(is_active=True)
+    for badge in badges:
+        if UserBadge.objects.filter(user=user, badge=badge).exists():
+            continue
+        unlocked = False
+        if badge.condition_type == 'TASKS_COMPLETED' and tasks_ok >= badge.condition_value:
+            unlocked = True
+        elif badge.condition_type == 'REFERRALS' and referrals_count >= badge.condition_value:
+            unlocked = True
+        elif badge.condition_type == 'TOTAL_EARNED' and user.total_earnings >= badge.condition_value:
+            unlocked = True
+        elif badge.condition_type == 'CHECKIN_STREAK' and user.check_in_streak >= badge.condition_value:
+            unlocked = True
+        elif badge.condition_type == 'VIP_PURCHASE' and user.vip_level and user.vip_level.price > 0:
+            unlocked = True
+        elif badge.condition_type == 'DAYS_ACTIVE' and days_active >= badge.condition_value:
+            unlocked = True
+        if unlocked:
+            UserBadge.objects.create(user=user, badge=badge)
+            if badge.reward_amount > 0:
+                user.balance += badge.reward_amount
+                user.total_earnings += badge.reward_amount
+                Transaction.objects.create(
+                    user=user, amount=badge.reward_amount,
+                    transaction_type='TASK_REWARD', status='COMPLETED',
+                    description=f"Badge débloqué: {badge.name}"
+                )
+            user.save()
+
+
+@login_required
+def gamification_view(request):
+    user = request.user
+    user.trust_score = compute_trust_score(user)
+    check_badge_unlocks(user)
+    user.save()
+
+    today = timezone.now().date()
+    earned_badges = UserBadge.objects.filter(user=user).select_related('badge')
+    missions = DailyMission.objects.filter(is_active=True)
+    mission_progress = UserMissionProgress.objects.filter(user=user, date=today).select_related('mission')
+
+    return render(request, 'core/gamification.html', {
+        'trust_score': user.trust_score,
+        'earned_badges': earned_badges,
+        'missions': missions,
+        'mission_progress': {mp.mission_id: mp for mp in mission_progress},
     })
 
 # --- ACTIONS ---

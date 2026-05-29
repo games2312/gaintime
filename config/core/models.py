@@ -122,6 +122,10 @@ class CustomUser(AbstractUser):
     referral_tier = models.IntegerField(default=0, verbose_name="Palier parrainage")
     total_referrals = models.IntegerField(default=0, verbose_name="Total filleuls directs")
 
+    # Gamification
+    trust_score = models.IntegerField(default=0, verbose_name="Score de confiance")
+    badges = models.ManyToManyField('Badge', through='UserBadge', blank=True)
+
     # Boosts actifs
     turbo_mining_until = models.DateTimeField(null=True, blank=True, verbose_name="Turbo minage jusqu'à")
     extra_tasks_today = models.IntegerField(default=0, verbose_name="Tâches supplémentaires aujourd'hui")
@@ -322,3 +326,74 @@ class Boost(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.price} F"
+
+
+class Badge(models.Model):
+    CONDITION_CHOICES = (
+        ('TASKS_COMPLETED', 'Tâches complétées'),
+        ('REFERRALS', 'Filleuls parrainés'),
+        ('TOTAL_EARNED', 'Gains totaux'),
+        ('CHECKIN_STREAK', 'Série check-in'),
+        ('VIP_PURCHASE', 'Achat VIP'),
+        ('DAYS_ACTIVE', 'Jours actifs'),
+    )
+    name = models.CharField(max_length=50)
+    description = models.TextField(blank=True)
+    icon = models.CharField(max_length=50, default='fa-star', help_text="Classe FontAwesome")
+    condition_type = models.CharField(max_length=30, choices=CONDITION_CHOICES)
+    condition_value = models.IntegerField(help_text="Valeur à atteindre")
+    reward_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['condition_value']
+
+    def __str__(self):
+        return self.name
+
+
+class UserBadge(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='earned_badges')
+    badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
+    earned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'badge')
+
+    def __str__(self):
+        return f"{self.user.username} → {self.badge.name}"
+
+
+class DailyMission(models.Model):
+    MISSION_TYPES = (
+        ('COMPLETE_TASKS', 'Compléter des tâches'),
+        ('MINE', 'Lancer le minage'),
+        ('SPIN_WHEEL', 'Tourner la roue'),
+        ('CHECK_IN', 'Check-in quotidien'),
+        ('VISIT', 'Visiter la plateforme'),
+    )
+    mission_type = models.CharField(max_length=30, choices=MISSION_TYPES)
+    target = models.IntegerField(default=1, help_text="Objectif à atteindre")
+    reward = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['mission_type']
+
+    def __str__(self):
+        return f"{self.get_mission_type_display()} - {self.reward} F"
+
+
+class UserMissionProgress(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='missions')
+    mission = models.ForeignKey(DailyMission, on_delete=models.CASCADE)
+    progress = models.IntegerField(default=0)
+    completed = models.BooleanField(default=False)
+    date = models.DateField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'mission', 'date')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.mission.mission_type}: {self.progress}/{self.mission.target}"

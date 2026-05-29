@@ -39,6 +39,9 @@ urlpatterns = [
 
     # Parrainage
     path('referral-program/', views.referral_program_view, name='referral_program'),
+
+    # Gamification
+    path('gamification/', views.gamification_view, name='gamification'),
     
     # Finance
     path('deposit/', views.deposit_view, name='deposit'),
