@@ -1,0 +1,30 @@
+{% extends 'core/base.html' %}
+{% block title %}Boosts - GainTime{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in-up">
+    <h1 class="text-2xl font-bold">Boosts</h1>
+    <p class="text-muted text-sm">Améliorez vos performances avec nos boosts</p>
+
+    <div class="grid gap-4">
+        {% for boost in boosts %}
+        <div class="glass-card p-5">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <h3 class="font-bold">{{ boost.name }}</h3>
+                    <p class="text-xs text-muted mt-1">{{ boost.description }}</p>
+                </div>
+                <span class="gold-gradient text-white text-xs font-bold px-3 py-1 rounded-full">{{ boost.price }} F</span>
+            </div>
+            <form method="POST" action="{% url 'buy_boost' boost.id %}">
+                {% csrf_token %}
+                <button type="submit" class="w-full gold-gradient text-white font-bold py-3 rounded-xl active:scale-95 transition">
+                    ACHETER MAINTENANT
+                </button>
+            </form>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-8">Aucun boost disponible pour le moment.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

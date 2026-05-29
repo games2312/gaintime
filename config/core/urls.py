@@ -32,6 +32,13 @@ urlpatterns = [
     # Plans VIP
     path('vip-plans/', views.vip_plans_view, name='vip_plans'),
     path('buy-vip/<int:plan_id>/', views.buy_vip, name='buy_vip'),
+
+    # Boosts
+    path('boosts/', views.boosts_view, name='boosts'),
+    path('buy-boost/<int:boost_id>/', views.buy_boost, name='buy_boost'),
+
+    # Parrainage
+    path('referral-program/', views.referral_program_view, name='referral_program'),
     
     # Finance
     path('deposit/', views.deposit_view, name='deposit'),

@@ -20,7 +20,7 @@ from django_ratelimit.decorators import ratelimit
 
 from .forms import RegisterForm, LoginForm, TaskForm, VIPLevelForm
 from .models import (
-    CustomUser, DepositMethod, FAQ, MiningSession, Notification,
+    Boost, CustomUser, DepositMethod, FAQ, MiningSession, Notification,
     SupportTicket, Task, Transaction, UserTaskCompletion, VIPLevel,
 )
 from .utils import compute_phash, get_client_ip, hamming_distance
@@ -137,6 +137,17 @@ def register_view(request):
             if free_level:
                 user.vip_level = free_level
                 user.save()
+
+            if user.referred_by:
+                referrer = user.referred_by
+                referrer.total_referrals = CustomUser.objects.filter(referred_by=referrer).count()
+                if referrer.total_referrals >= 100:
+                    referrer.referral_tier = 3
+                elif referrer.total_referrals >= 20:
+                    referrer.referral_tier = 2
+                elif referrer.total_referrals >= 5:
+                    referrer.referral_tier = 1
+                referrer.save()
             
             messages.success(request, "Inscription réussie ! Veuillez vérifier votre numéro.")
             # On connecte l'utilisateur pour qu'il puisse accéder à la page de vérification
@@ -311,7 +322,7 @@ def tasks_view(request):
         'completed_task_ids': completed_task_ids,
         'user_level': user_level,
         'tasks_done_count': len(completed_task_ids),
-        'daily_limit': user_level.daily_task_limit
+        'daily_limit': user_level.daily_task_limit + request.user.extra_tasks_today
     })
 
 @login_required
@@ -505,6 +516,51 @@ def vip_plans_view(request):
     plans = VIPLevel.objects.all().order_by('price')
     return render(request, 'core/plan_investissement_reward.html', {'plans': plans})
 
+@login_required
+def boosts_view(request):
+    boosts = Boost.objects.filter(is_active=True)
+    return render(request, 'core/boosts.html', {'boosts': boosts})
+
+@login_required
+def buy_boost(request, boost_id):
+    boost = get_object_or_404(Boost, id=boost_id, is_active=True)
+    user = request.user
+    if request.method == 'POST':
+        if user.balance < boost.price:
+            messages.error(request, "Solde insuffisant.")
+            return redirect('boosts')
+        user.balance -= boost.price
+        now = timezone.now()
+        if boost.boost_type == 'TURBO_MINING':
+            if user.turbo_mining_until and user.turbo_mining_until > now:
+                user.turbo_mining_until += timezone.timedelta(hours=boost.duration_hours)
+            else:
+                user.turbo_mining_until = now + timezone.timedelta(hours=boost.duration_hours)
+        elif boost.boost_type == 'FREE_SPIN_PACK':
+            user.free_spins += boost.quantity
+        elif boost.boost_type == 'EXTRA_TASKS':
+            user.extra_tasks_today += boost.quantity
+        user.save()
+        Transaction.objects.create(
+            user=user, amount=boost.price, transaction_type='BOOST_PURCHASE',
+            status='COMPLETED', description=f"Boost: {boost.name}"
+        )
+        messages.success(request, f"Boost {boost.name} activé !")
+    return redirect('boosts')
+
+@login_required
+def referral_program_view(request):
+    tiers = [
+        {'level': 1, 'needed': 5, 'bonus': '+1% commission'},
+        {'level': 2, 'needed': 20, 'bonus': '+2% commission + groupe Telegram'},
+        {'level': 3, 'needed': 100, 'bonus': '+5% commission + cashback VIP'},
+    ]
+    return render(request, 'core/referral_program.html', {
+        'tiers': tiers,
+        'current_tier': request.user.referral_tier,
+        'total_referrals': request.user.total_referrals,
+    })
+
 # --- ACTIONS ---
 
 @login_required
@@ -637,6 +693,9 @@ def claim_mining(request):
         if session and session.is_completed:
             user_level = request.user.vip_level or VIPLevel.objects.filter(price=0).first()
             amount = user_level.daily_mining_reward
+            now = timezone.now()
+            if request.user.turbo_mining_until and request.user.turbo_mining_until > now:
+                amount *= 2
             request.user.balance += amount
             request.user.total_earnings += amount
             request.user.save()
@@ -655,7 +714,7 @@ def complete_task(request, task_id):
     today = timezone.now().date()
     if UserTaskCompletion.objects.filter(user=request.user, task=task, completed_at__date=today).exists():
         messages.warning(request, "Déjà soumis aujourd'hui.")
-    elif UserTaskCompletion.objects.filter(user=request.user, completed_at__date=today).count() >= user_level.daily_task_limit:
+    elif UserTaskCompletion.objects.filter(user=request.user, completed_at__date=today).count() >= user_level.daily_task_limit + request.user.extra_tasks_today:
         messages.error(request, "Limite atteinte.")
     else:
         screenshot = request.FILES.get('screenshot')
@@ -704,7 +763,7 @@ def start_auto_task(request, task_id):
         messages.warning(request, "Tâche déjà validée pour aujourd'hui.")
         return redirect('tasks')
 
-    if UserTaskCompletion.objects.filter(user=request.user, completed_at__date=today).count() >= user_level.daily_task_limit:
+    if UserTaskCompletion.objects.filter(user=request.user, completed_at__date=today).count() >= user_level.daily_task_limit + request.user.extra_tasks_today:
         messages.error(request, "Limite de tâches atteinte.")
         return redirect('tasks')
 

@@ -1,0 +1,32 @@
+{% extends 'core/base.html' %}
+{% block title %}Programme Parrainage - GainTime{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in-up">
+    <h1 class="text-2xl font-bold">Programme Parrainage</h1>
+    <p class="text-muted text-sm">Vous avez <strong>{{ total_referrals }}</strong> filleul(s) — Niveau {{ current_tier }}</p>
+
+    <div class="glass-card p-5 text-center">
+        <p class="text-3xl font-black gold-gradient text-transparent bg-clip-text">{{ total_referrals }}</p>
+        <p class="text-xs text-muted">filleuls directs</p>
+    </div>
+
+    <h2 class="font-bold text-lg mt-6">Paliers</h2>
+    <div class="space-y-3">
+        {% for tier in tiers %}
+        <div class="glass-card p-4 {% if tier.level <= current_tier %}border border-yellow-500/30{% endif %}">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="font-bold">Palier {{ tier.level }}</span>
+                    <p class="text-xs text-muted">{{ tier.needed }} filleuls — {{ tier.bonus }}</p>
+                </div>
+                {% if tier.level <= current_tier %}
+                <span class="text-green-500 text-xs font-bold">DÉBLOQUÉ</span>
+                {% else %}
+                <span class="text-muted text-xs">{{ tier.needed }} filleuls requis</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

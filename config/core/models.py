@@ -118,6 +118,14 @@ class CustomUser(AbstractUser):
     interests = models.CharField(max_length=255, blank=True, null=True, verbose_name="Centres d'intérêt")
     survey_data = models.JSONField(default=dict, blank=True, null=True, verbose_name="Données détaillées du sondage")
 
+    # Paliers de parrainage
+    referral_tier = models.IntegerField(default=0, verbose_name="Palier parrainage")
+    total_referrals = models.IntegerField(default=0, verbose_name="Total filleuls directs")
+
+    # Boosts actifs
+    turbo_mining_until = models.DateTimeField(null=True, blank=True, verbose_name="Turbo minage jusqu'à")
+    extra_tasks_today = models.IntegerField(default=0, verbose_name="Tâches supplémentaires aujourd'hui")
+
     # Statistiques et Sécurité Financière
     total_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="Gains Totaux cumulés")
     withdrawal_phone_locked = models.CharField(max_length=15, blank=True, null=True, verbose_name="Numéro de retrait verrouillé")
@@ -262,6 +270,7 @@ class Transaction(models.Model):
         ('REFERRAL_BONUS', 'Bonus Parrainage'),
         ('DAILY_CHECKIN', 'Bonus Quotidien'),
         ('SPIN_WIN', 'Roue de la Fortune'),
+        ('BOOST_PURCHASE', 'Achat Boost'),
     )
     STATUS_CHOICES = (
         ('PENDING', 'En attente'),
@@ -290,3 +299,26 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.get_transaction_type_display()} - {self.amount}"
+
+
+class Boost(models.Model):
+    BOOST_TYPES = (
+        ('TURBO_MINING', 'Turbo Mining'),
+        ('FREE_SPIN_PACK', 'Pack Tours Gratuits'),
+        ('EXTRA_TASKS', 'Tâches Supplémentaires'),
+        ('DOUBLE_REWARD', 'Gain Doublé'),
+        ('WITHDRAWAL_PRIORITY', 'Retrait Prioritaire'),
+    )
+    name = models.CharField(max_length=50)
+    boost_type = models.CharField(max_length=30, choices=BOOST_TYPES, unique=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.TextField(blank=True)
+    quantity = models.IntegerField(default=1, help_text="Quantité délivrée (ex: 5 tours)")
+    duration_hours = models.IntegerField(default=0, help_text="Durée en heures (0 = immédiat)")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['price']
+
+    def __str__(self):
+        return f"{self.name} - {self.price} F"
