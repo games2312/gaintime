@@ -208,12 +208,10 @@ LOCALE_PATHS = [
 STATIC_URL = 'static/'
 
 if not DEBUG:
-    # Indiquez à Django de copier les ressources statiques dans un chemin appelé `staticfiles` (spécifique à Render)
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    # Activer le backend de stockage WhiteNoise
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 else:
     STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
