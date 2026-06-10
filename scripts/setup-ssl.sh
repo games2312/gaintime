@@ -35,7 +35,7 @@ docker run --rm \
     -v "$CERTBOT_DIR/www:/var/www/certbot:rw" \
     -v "$CERTBOT_DIR/conf:/etc/letsencrypt:rw" \
     -p 80:80 \
-    certbot/certbot:v3.3.1 certonly \
+    certbot/certbot:latest certonly \
     --standalone \
     --non-interactive \
     --agree-tos \

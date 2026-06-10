@@ -19,7 +19,7 @@ echo "--- Renouvellement des certificats SSL ---"
 docker run --rm \
     -v "$CERTBOT_DIR/www:/var/www/certbot:rw" \
     -v "$CERTBOT_DIR/conf:/etc/letsencrypt:rw" \
-    certbot/certbot:v3.3.1 renew --quiet
+    certbot/certbot:latest renew --quiet
 
 echo "--- Rechargement de nginx ---"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec nginx nginx -s reload || true
