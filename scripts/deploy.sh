@@ -66,7 +66,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm web pyt
 
 # 7. Redémarrer les services
 echo "--- Redémarrage des services ---"
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
 
 # 8. Nettoyer les anciennes images
 echo "--- Nettoyage ---"
