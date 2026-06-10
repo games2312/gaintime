@@ -17,6 +17,15 @@ COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
 
 echo "--- Installation du service systemd pour $SERVICE_NAME ---"
 
+# Créer .env si absent (docker-compose.yml le référence obligatoirement)
+if [ ! -f "$PROJECT_DIR/.env" ]; then
+    echo "Création de .env (symlink vers .env.prod)..."
+    ln -sf .env.prod "$PROJECT_DIR/.env"
+fi
+
+# Lire POSTGRES_PASSWORD depuis .env.prod
+POSTGRES_PASSWORD=$(grep -oP '^POSTGRES_PASSWORD=\K.*' "$PROJECT_DIR/.env.prod" 2>/dev/null || echo "")
+
 cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=GainTime — Plateforme de micro-revenus
@@ -28,6 +37,7 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$PROJECT_DIR
+Environment=POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 ExecStart=/usr/bin/docker compose $COMPOSE_FILES up -d --remove-orphans
 ExecStop=/usr/bin/docker compose $COMPOSE_FILES down
 ExecReload=/usr/bin/docker compose $COMPOSE_FILES restart
