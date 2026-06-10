@@ -65,9 +65,13 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read', 'created_at']),
+        ]
 
 class FAQ(models.Model):
     question = models.CharField(max_length=255)
@@ -110,7 +114,8 @@ class CustomUser(AbstractUser):
     # Nouveau : Badge de confiance
     is_verified = models.BooleanField(default=False, verbose_name="Compte Vérifié")
     is_phone_verified = models.BooleanField(default=False, verbose_name="Téléphone Vérifié")
-    otp_code = models.CharField(max_length=6, blank=True, null=True, verbose_name="Code OTP")
+    otp_code = models.CharField(max_length=128, blank=True, null=True, verbose_name="Code OTP (hashé)")
+    otp_created_at = models.DateTimeField(null=True, blank=True, verbose_name="Date de création OTP")
     has_seen_onboarding = models.BooleanField(default=False, verbose_name="A vu le tutoriel")
 
     # Personnalisation Communauté
@@ -125,6 +130,8 @@ class CustomUser(AbstractUser):
     # Gamification
     trust_score = models.IntegerField(default=0, verbose_name="Score de confiance")
     badges = models.ManyToManyField('Badge', through='UserBadge', blank=True)
+    xp = models.IntegerField(default=0, verbose_name="Points d'expérience")
+    level = models.IntegerField(default=1, verbose_name="Niveau")
 
     # Boosts actifs
     turbo_mining_until = models.DateTimeField(null=True, blank=True, verbose_name="Turbo minage jusqu'à")
@@ -134,7 +141,10 @@ class CustomUser(AbstractUser):
     total_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="Gains Totaux cumulés")
     withdrawal_phone_locked = models.CharField(max_length=15, blank=True, null=True, verbose_name="Numéro de retrait verrouillé")
 
+    dark_mode = models.BooleanField(default=True, verbose_name="Mode sombre")
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
         if not self.invitation_code:
@@ -153,22 +163,25 @@ class CustomUser(AbstractUser):
             models.Index(fields=['referred_by']),
             models.Index(fields=['device_fingerprint']),
         ]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(balance__gte=0), name='balance_non_negative'),
+        ]
 
 class MiningSession(models.Model):
-    DURATION_HOURS = 12
+    DURATION_HOURS = 4
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     start_time = models.DateTimeField(auto_now_add=True)
     end_time = models.DateTimeField()
-    is_active = models.BooleanField(default=True)
-    is_claimed = models.BooleanField(default=False)
-    earned_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
 
     def save(self, *args, **kwargs):
         if not self.end_time:
             self.end_time = timezone.now() + timezone.timedelta(hours=self.DURATION_HOURS)
         super().save(*args, **kwargs)
-    
-    @property
+    is_active = models.BooleanField(default=True)
+    is_claimed = models.BooleanField(default=False)
+    earned_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    updated_at = models.DateTimeField(auto_now=True)
+
     def is_completed(self):
         return timezone.now() >= self.end_time
 
@@ -219,6 +232,7 @@ class Task(models.Model):
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
@@ -231,16 +245,19 @@ class UserTaskCompletion(models.Model):
     )
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
-    # Remplacement de ImageField par FileField pour éviter l'erreur Pillow si l'installation échoue
     screenshot = models.FileField(upload_to='tasks/proofs/', null=True, blank=True, verbose_name="Capture d'écran")
     proof_link = models.URLField(max_length=500, null=True, blank=True, verbose_name="Lien de preuve")
     image_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True, verbose_name="Hash de l'image")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
-    completed_at = models.DateTimeField(auto_now_add=True) # Date précise pour vérifier la limite journalière
+    completed_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Tâche réalisée"
         verbose_name_plural = "Tâches réalisées"
+        indexes = [
+            models.Index(fields=['user', 'completed_at']),
+        ]
 
 class SupportTicket(models.Model):
     STATUS_CHOICES = (
@@ -293,11 +310,13 @@ class Transaction(models.Model):
     proof_image = models.FileField(upload_to='deposits/proofs/', null=True, blank=True, verbose_name="Preuve de dépôt")
     description = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         indexes = [
             models.Index(fields=['user', 'transaction_type', 'status', 'created_at']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['reference_id']),
         ]
         ordering = ['-created_at']
 
@@ -398,6 +417,22 @@ class UserMissionProgress(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.mission.mission_type}: {self.progress}/{self.mission.target}"
 
+
+class Announcement(models.Model):
+    title = models.CharField(max_length=200, verbose_name="Titre")
+    message = models.TextField(verbose_name="Message")
+    link = models.URLField(blank=True, null=True, verbose_name="Lien (optionnel)")
+    link_text = models.CharField(max_length=100, blank=True, default="En savoir plus", verbose_name="Texte du lien")
+    is_active = models.BooleanField(default=True, verbose_name="Actif")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Annonce"
+        verbose_name_plural = "Annonces"
+
+    def __str__(self):
+        return self.title
 
 class PushSubscription(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='push_subscriptions')

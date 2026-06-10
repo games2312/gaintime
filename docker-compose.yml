@@ -1,29 +1,27 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: scam
-      POSTGRES_USER: wends23
-      POSTGRES_PASSWORD: scam2024pass
+      POSTGRES_DB: ${POSTGRES_DB:-scam}
+      POSTGRES_USER: ${POSTGRES_USER:-wends23}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wends23 -d scam"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wends23} -d ${POSTGRES_DB:-scam}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: always
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: always
 
   web:
     build: .
@@ -37,13 +35,16 @@ services:
         condition: service_healthy
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
-      REDIS_URL: redis://redis:6379/1
     volumes:
-      - .:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check", "--deploy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   celery_worker:
     build: .
@@ -55,9 +56,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
-      REDIS_URL: redis://redis:6379/1
+    restart: always
 
   celery_beat:
     build: .
@@ -69,9 +68,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
-      REDIS_URL: redis://redis:6379/1
+    restart: always
 
   bot:
     build: .
@@ -81,8 +78,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgres://wends23:scam2024pass@db:5432/scam
+    restart: always
 
 volumes:
   postgres_data:

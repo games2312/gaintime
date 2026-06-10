@@ -3,6 +3,9 @@
 
 {% block title %}Mining Center - GainTime{% endblock %}
 
+{% block extra_css %}
+{% endblock %}
+
 {% block content %}
 <div class="space-y-8">
     <!-- Main Mining Card -->
@@ -68,11 +71,11 @@
     <!-- Mining Stats Grid -->
     <div class="grid grid-cols-2 gap-4 fade-in-up" style="animation-delay: 0.1s;">
         <div class="glass-card p-6 flex flex-col items-center justify-center border-b-2 border-b-primary-gold">
-            <p class="text-[9px] font-black text-muted uppercase tracking-widest mb-2">{% trans "Gain / Session" %}</p>
+            <p class="text-[9px] font-black text-muted uppercase tracking-widest mb-2">{% trans "Gain / Session" %} <span class="help-tip text-muted/50"><i class="fas fa-question-circle text-[10px]"></i><span class="help-text">Session de 4h. Jusqu'à 6 sessions/jour.</span></span></p>
             <p class="text-xl font-black">{{ user.vip_level.daily_mining_reward|default:"25" }} <span class="text-xs opacity-40">F</span></p>
         </div>
         <div class="glass-card p-6 flex flex-col items-center justify-center border-b-2 border-b-accent-purple">
-            <p class="text-[9px] font-black text-muted uppercase tracking-widest mb-2">{% trans "Niveau" %}</p>
+            <p class="text-[9px] font-black text-muted uppercase tracking-widest mb-2">{% trans "Niveau" %} <span class="help-tip text-muted/50"><i class="fas fa-question-circle text-[10px]"></i><span class="help-text">Plus votre niveau VIP est élevé, plus vous gagnez par session.</span></span></p>
             <p class="text-xl font-black text-accent-purple uppercase tracking-tight">{{ user.vip_level.name|default:"Gratuit" }}</p>
         </div>
     </div>
@@ -83,7 +86,7 @@
 <script>
     {% if active_session and remaining_seconds > 0 %}
     let remainingSeconds = {{ remaining_seconds|default:0 }};
-    const totalDuration = 12 * 3600;
+    const totalDuration = 4 * 3600;
     const circle = document.getElementById('progress-circle');
     const circumference = 2 * Math.PI * 46;
 

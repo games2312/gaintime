@@ -3,6 +3,7 @@
 __pycache__/
 db.sqlite3
 .env
+.env.prod
 reward/
 staticfiles/
 media/
@@ -22,3 +23,5 @@ config/core/migrations/*.pyc
 *.key
 *.pem
 *.cert
+nginx/ssl/
+.venv/

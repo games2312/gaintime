@@ -80,6 +80,7 @@ urlpatterns = [
     path('management/tasks/', views.admin_manage_tasks, name='admin_manage_tasks'),
     path('management/tasks/add/', views.admin_add_task, name='admin_task_add'),
     path('management/tasks/edit/<int:task_id>/', views.admin_edit_task, name='admin_task_edit'),
+    path('management/tasks/delete/<int:task_id>/', views.admin_delete_task, name='admin_task_delete'),
     path('management/deposits/', views.admin_manage_deposit_methods, name='admin_manage_deposit_methods'),
     path('management/deposits/add/', views.admin_add_deposit_method, name='admin_deposit_add'),
     path('management/deposits/delete/<int:method_id>/', views.admin_delete_deposit_method, name='admin_deposit_delete'),
@@ -88,6 +89,18 @@ urlpatterns = [
     path('management/vip/add/', views.admin_add_vip, name='admin_vip_add'),
     path('management/vip/edit/<int:vip_id>/', views.admin_edit_vip, name='admin_vip_edit'),
     path('management/vip/delete/<int:vip_id>/', views.admin_delete_vip, name='admin_vip_delete'),
+
+    # API Thème
+    path('api/theme/', views.theme_api_view, name='theme_api'),
+
+    # QR Code
+    path('qr/<str:code>/', views.qr_code_view, name='qr_code'),
+
+    # Annonces Admin
+    path('management/announcements/', views.admin_announcements, name='admin_announcements'),
+    path('management/announcements/add/', views.admin_add_announcement, name='admin_add_announcement'),
+    path('management/announcements/toggle/<int:ann_id>/', views.admin_toggle_announcement, name='admin_toggle_announcement'),
+    path('management/announcements/delete/<int:ann_id>/', views.admin_delete_announcement, name='admin_delete_announcement'),
 
     # Notifications Push Web
     path('api/push/subscribe/', push_views.push_subscribe, name='push_subscribe'),

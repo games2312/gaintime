@@ -1,17 +1,21 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
+from django.core.files.uploadedfile import SimpleUploadedFile
 from datetime import timedelta
+import json
 from decimal import Decimal
+from datetime import timedelta
 from unittest.mock import Mock
 
 from core.models import (
     CustomUser, VIPLevel, Transaction, MiningSession,
     Task, Boost, Badge, UserBadge, DailyMission,
-    UserMissionProgress, PushSubscription,
+    UserMissionProgress, PushSubscription, DepositMethod,
+    UserTaskCompletion,
 )
 from core.views import compute_trust_score, check_badge_unlocks
-from core.utils import compute_phash, hamming_distance, get_client_ip
+from core.utils import compute_phash, hamming_distance, get_client_ip, validate_image_magic_bytes
 
 
 def secure_client():
@@ -499,3 +503,332 @@ class BadgeUnlockTests(TestCase):
         UserBadge.objects.create(user=self.user, badge=self.badge)
         check_badge_unlocks(self.user)
         self.assertEqual(UserBadge.objects.filter(user=self.user, badge=self.badge).count(), 1)
+
+
+class DepositViewTests(TestCase, AuthenticatedViewMixin):
+    def setUp(self):
+        self.client = secure_client()
+        self.user = self._login_and_verify('depositor', '691234591')
+        DepositMethod.objects.create(operator='OM', name='Test OM', number='670000000', is_active=True)
+        self.valid_file = SimpleUploadedFile('proof.png', b'\x89PNG\r\n\x1a\n\x00\x00\x00\x00', content_type='image/png')
+
+    def test_deposit_page_200(self):
+        r = self.client.get(reverse('deposit'), secure=True)
+        self.assertEqual(r.status_code, 200)
+
+    def test_deposit_missing_fields(self):
+        r = self.client.post(reverse('deposit'), {'amount': '1000'}, secure=True, follow=True)
+        self.assertContains(r, 'Veuillez remplir tous les champs')
+
+    def test_deposit_invalid_amount(self):
+        r = self.client.post(reverse('deposit'), {
+            'amount': 'abc', 'sender_phone': '670000001', 'reference': 'ref123',
+            'proof_image': self.valid_file,
+        }, secure=True, follow=True)
+        self.assertContains(r, 'Montant invalide')
+
+    def test_deposit_below_minimum(self):
+        r = self.client.post(reverse('deposit'), {
+            'amount': '100', 'sender_phone': '670000001', 'reference': 'ref123',
+            'proof_image': self.valid_file,
+        }, secure=True, follow=True)
+        tx = Transaction.objects.filter(user=self.user, transaction_type='DEPOSIT').count()
+        self.assertEqual(tx, 0)
+
+    def test_deposit_creates_pending_tx(self):
+        r = self.client.post(reverse('deposit'), {
+            'amount': '1000', 'sender_phone': '670000001',
+            'reference': 'ref123', 'payment_method': 'OM',
+            'proof_image': self.valid_file,
+        }, secure=True, follow=True)
+        tx = Transaction.objects.filter(user=self.user, transaction_type='DEPOSIT').first()
+        self.assertIsNotNone(tx)
+        self.assertEqual(tx.status, 'PENDING')
+
+
+class WithdrawalViewTests(TestCase, AuthenticatedViewMixin):
+    def setUp(self):
+        self.client = secure_client()
+        self.vip = VIPLevel.objects.create(name='Platinum', price=10000, daily_mining_reward=500, daily_task_limit=10, task_reward_rate=200)
+        self.user = self._login_and_verify('withdrawer', '691234592')
+        self.user.vip_level = self.vip
+        self.user.balance = Decimal('50000')
+        self.user.save()
+
+    def test_withdraw_page_200(self):
+        r = self.client.get(reverse('withdraw'), secure=True)
+        self.assertEqual(r.status_code, 200)
+
+    def test_withdraw_below_minimum(self):
+        r = self.client.post(reverse('withdraw'), {
+            'amount': '500', 'phone_number': '670000001', 'payment_method': 'OM'
+        }, secure=True, follow=True)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal('50000'))
+
+    def test_withdraw_creates_pending_tx(self):
+        r = self.client.post(reverse('withdraw'), {
+            'amount': '5000', 'phone_number': '670000001', 'payment_method': 'OM'
+        }, secure=True, follow=True)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal('45000'))
+        tx = Transaction.objects.filter(user=self.user, transaction_type='WITHDRAWAL').first()
+        self.assertIsNotNone(tx)
+        self.assertEqual(tx.status, 'PENDING')
+
+    def test_withdraw_daily_limit(self):
+        for i in range(3):
+            self.client.post(reverse('withdraw'), {
+                'amount': '20000', 'phone_number': '670000001', 'payment_method': 'OM'
+            }, secure=True, follow=True)
+            self.user.refresh_from_db()
+        self.assertGreaterEqual(self.user.balance, Decimal('10000'))
+
+
+class AutoTaskTests(TestCase, AuthenticatedViewMixin):
+    def setUp(self):
+        self.client = secure_client()
+        self.user = self._login_and_verify('autotasker', '691234593')
+        self.task = Task.objects.create(
+            title='Auto Task', is_automatic=True, duration_seconds=10,
+            reward_amount=Decimal('50'), is_active=True
+        )
+
+    def test_auto_task_creates_pending(self):
+        r = self.client.post(reverse('start_auto_task', args=[self.task.id]), secure=True, follow=True)
+        c = UserTaskCompletion.objects.filter(user=self.user, task=self.task).first()
+        self.assertIsNotNone(c)
+        self.assertEqual(c.status, 'PENDING')
+
+    def test_claim_auto_task_too_early(self):
+        self.client.post(reverse('start_auto_task', args=[self.task.id]), secure=True, follow=True)
+        c = UserTaskCompletion.objects.filter(user=self.user, task=self.task).first()
+        c.completed_at = timezone.now()
+        c.save()
+        r = self.client.post(reverse('claim_auto_task', args=[self.task.id]), secure=True, follow=True)
+        c.refresh_from_db()
+        self.assertNotEqual(c.status, 'APPROVED')
+
+    def test_claim_auto_task_needs_admin(self):
+        self.client.post(reverse('start_auto_task', args=[self.task.id]), secure=True, follow=True)
+        c = UserTaskCompletion.objects.filter(user=self.user, task=self.task).first()
+        c.completed_at = timezone.now() - timedelta(seconds=20)
+        c.save()
+        r = self.client.post(reverse('claim_auto_task', args=[self.task.id]), secure=True, follow=True)
+        c.refresh_from_db()
+        self.assertEqual(c.status, 'PENDING')
+
+
+class PushSubscribeViewTests(TestCase, AuthenticatedViewMixin):
+    def setUp(self):
+        self.client = secure_client()
+        self.user = self._login_and_verify('pushsub', '691234594')
+
+    def test_subscribe(self):
+        r = self.client.post(reverse('push_subscribe'), {
+            'endpoint': 'https://fcm.test/push1',
+            'keys': {'auth': 'auth1', 'p256dh': 'key1'}
+        }, content_type='application/json', secure=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(PushSubscription.objects.filter(user=self.user).exists())
+
+    def test_unsubscribe(self):
+        PushSubscription.objects.create(user=self.user, endpoint='https://fcm.test/push1')
+        r = self.client.post(reverse('push_unsubscribe'), {
+            'endpoint': 'https://fcm.test/push1'
+        }, content_type='application/json', secure=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(PushSubscription.objects.filter(user=self.user).exists())
+
+    def test_settings_returns_enabled(self):
+        PushSubscription.objects.create(user=self.user, endpoint='https://fcm.test/push1')
+        r = self.client.get(reverse('push_settings'), secure=True)
+        data = json.loads(r.content)
+        self.assertTrue(data['enabled'])
+
+
+class MagicBytesValidationTests(TestCase):
+    def test_jpeg_magic_bytes(self):
+        import io
+        buf = io.BytesIO(b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01')
+        self.assertTrue(validate_image_magic_bytes(buf))
+
+    def test_png_magic_bytes(self):
+        import io
+        buf = io.BytesIO(b'\x89PNG\r\n\x1a\n' + b'\x00' * 8)
+        self.assertTrue(validate_image_magic_bytes(buf))
+
+    def test_webp_magic_bytes(self):
+        import io
+        buf = io.BytesIO(b'RIFF\x00\x00\x00\x00WEBP' + b'\x00' * 8)
+        self.assertTrue(validate_image_magic_bytes(buf))
+
+    def test_invalid_magic_bytes(self):
+        import io
+        buf = io.BytesIO(b'GIF89a\x00\x00\x00\x00')
+        self.assertFalse(validate_image_magic_bytes(buf))
+
+
+class SecureSettingsTests(TestCase):
+    def test_secret_key_required(self):
+        import os
+        key = os.environ.get('SECRET_KEY')
+        self.assertIsNotNone(key)
+        self.assertNotEqual(key, 'django-insecure-default-key-change-me')
+
+    def test_csrf_cookie_httponly(self):
+        from django.conf import settings
+        self.assertTrue(settings.CSRF_COOKIE_HTTPONLY)
+
+    def test_session_cookie_httponly(self):
+        from django.conf import settings
+        self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
+
+
+class AllUrlsTest(TestCase):
+    """Vérifie que chaque URL répond correctement (200 pour public, 302/403 pour auth)."""
+
+    def setUp(self):
+        self.client = secure_client()
+        VIPLevel.objects.get_or_create(name='Free', defaults=dict(price=0, daily_mining_reward=100, daily_task_limit=3, task_reward_rate=50))
+        self.vip_paid, _ = VIPLevel.objects.get_or_create(name='VIP1', defaults=dict(price=5000, daily_mining_reward=500, daily_task_limit=10, task_reward_rate=200))
+        self.user = CustomUser.objects.create_user(username='urlcheck', phone_number='699999990', password='test123')
+        self.user.is_phone_verified = True
+        self.user.has_completed_survey = True
+        self.user.vip_level = self.vip_paid
+        self.user.save()
+        self.staff = CustomUser.objects.create_user(username='admincheck', phone_number='699999991', password='test123', is_staff=True)
+        self.staff.is_phone_verified = True
+        self.staff.save()
+        Task.objects.create(title='URL Test Task', reward_amount=Decimal('50'), is_active=True)
+
+    def _public_200(self, name, *args):
+        r = self.client.get(reverse(name, args=args), secure=True)
+        self.assertEqual(r.status_code, 200, f'{name} should be 200, got {r.status_code}')
+
+    def _auth_200(self, name, *args):
+        self.client.force_login(self.user)
+        r = self.client.get(reverse(name, args=args), secure=True)
+        self.assertEqual(r.status_code, 200, f'{name} (auth) should be 200, got {r.status_code}')
+        self.client.logout()
+
+    def _auth_302(self, name, *args):
+        r = self.client.get(reverse(name, args=args), secure=True)
+        self.assertIn(r.status_code, [302, 403], f'{name} (anon) should be 302/403, got {r.status_code}')
+
+    def _admin_200(self, name, *args):
+        self.client.force_login(self.staff)
+        r = self.client.get(reverse(name, args=args), secure=True)
+        self.assertEqual(r.status_code, 200, f'{name} (admin) should be 200, got {r.status_code}')
+        self.client.logout()
+
+    def _admin_302(self, name, *args):
+        r = self.client.get(reverse(name, args=args), secure=True)
+        self.assertIn(r.status_code, [302, 403], f'{name} (anon→admin) should be 302/403, got {r.status_code}')
+
+    def test_public_pages(self):
+        pages = ['home', 'register', 'login', 'forgot_password', 'faq', 'cgu', 'privacy', 'offline']
+        for p in pages:
+            self._public_200(p)
+
+    def test_auth_pages(self):
+        pages = [
+            'dashboard', 'tasks', 'mining', 'team', 'leaderboard',
+            'profile', 'communaute', 'wallet', 'notifications', 'support',
+            'vip_plans', 'boosts', 'referral_program', 'gamification',
+            'chat', 'deposit', 'withdraw', 'wheel',
+        ]
+        for p in pages:
+            self._auth_302(p)
+            self._auth_200(p)
+
+    def test_survey_page(self):
+        """Survey est inaccessible si déjà complété, accessible sinon."""
+        # User who hasn't completed survey
+        fresh_user = CustomUser.objects.create_user(username='fresher', phone_number='699999987', password='test123')
+        fresh_user.is_phone_verified = True
+        fresh_user.has_completed_survey = False
+        fresh_user.save()
+        self.client.force_login(fresh_user)
+        r = self.client.get(reverse('survey'), secure=True)
+        self.assertEqual(r.status_code, 200)
+        self.client.logout()
+        # User who completed survey → redirect
+        self.client.force_login(self.user)
+        r = self.client.get(reverse('survey'), secure=True)
+        self.assertEqual(r.status_code, 302)
+        self.client.logout()
+
+    def test_post_only_endpoints(self):
+        """Ces endpoints doivent retourner 405 (GET interdit) ou 302/403 (anon)."""
+        task = Task.objects.first()
+        endpoints = {
+            'start_mining': [],
+            'claim_mining': [],
+            'daily_check_in': [],
+            'spin_wheel': [],
+            'start_auto_task': [task.id],
+            'claim_auto_task': [task.id],
+            'finish_onboarding': [],
+            'push_subscribe': [],
+            'push_unsubscribe': [],
+        }
+        for name, args in endpoints.items():
+            r = self.client.get(reverse(name, args=args), secure=True)
+            self.assertIn(r.status_code, [302, 403, 405], f'{name} GET should not be 200, got {r.status_code}')
+
+    def test_task_param_urls(self):
+        task = Task.objects.first()
+        self._auth_302('complete_task', task.id)
+        self._auth_302('start_auto_task', task.id)
+
+    def test_buy_vip_urls(self):
+        vip = VIPLevel.objects.filter(price=0).first() or VIPLevel.objects.create(name='TestVIP', price=1000, daily_mining_reward=100, daily_task_limit=5, task_reward_rate=100)
+        self._auth_302('buy_vip', vip.id)
+
+    def test_buy_boost_urls(self):
+        boost = Boost.objects.create(name='TestBoost', price=100, boost_type='TURBO_MINING', duration_hours=12)
+        self._auth_302('buy_boost', boost.id)
+
+    def test_admin_urls(self):
+        admin_pages = [
+            'admin_dashboard', 'admin_support', 'admin_users',
+            'admin_export_withdrawals', 'admin_review_tasks',
+            'admin_manage_tasks', 'admin_task_add', 'admin_manage_deposit_methods',
+            'admin_manage_vip', 'admin_vip_add',
+        ]
+        for p in admin_pages:
+            self._admin_302(p)
+            self._admin_200(p)
+
+    def test_notification_count_public(self):
+        """Le compteur doit fonctionner pour l'utilisateur connecté."""
+        self.client.force_login(self.user)
+        r = self.client.get(reverse('unread_notifications_count'), secure=True)
+        self.assertEqual(r.status_code, 200)
+        self.client.logout()
+
+    def test_push_settings_works(self):
+        self.client.force_login(self.user)
+        r = self.client.get(reverse('push_settings'), secure=True)
+        self.assertEqual(r.status_code, 200)
+        self.client.logout()
+
+    def test_full_registration_flow(self):
+        """Inscription → connexion → dashboard (sans vérif téléphone)."""
+        # Create a referrer first to get an invitation code
+        referrer = CustomUser.objects.create_user(username='referrer', phone_number='699999988', password='Test12345')
+        referrer.is_phone_verified = True
+        referrer.save()
+        r = self.client.post(reverse('register'), {
+            'username': 'newflow', 'phone_number': '699999992',
+            'password': 'Test12345', 'confirm_password': 'Test12345',
+            'invitation_code_input': referrer.invitation_code,
+        }, secure=True, follow=True)
+        self.assertContains(r, 'Inscription réussie')
+        self.assertTrue(CustomUser.objects.filter(username='newflow', is_phone_verified=True).exists())
+
+    def test_login_flow(self):
+        CustomUser.objects.create_user(username='loginflow', phone_number='699999993', password='Test12345')
+        r = self.client.post(reverse('login'), {'username': 'loginflow', 'password': 'Test12345'}, secure=True, follow=True)
+        self.assertIn('_auth_user_id', self.client.session)

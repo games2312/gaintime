@@ -1,7 +1,29 @@
 from django.utils import timezone
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.conf import settings
 from .models import VIPLevel, Notification
+
+
+class ContentSecurityPolicyMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if not settings.DEBUG:
+            response['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+                "style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.tailwindcss.com 'unsafe-inline'; "
+                "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+                "img-src 'self' data: https://upload.wikimedia.org https://ui-avatars.com; "
+                "connect-src 'self' https://sentry.io; "
+                "frame-src 'none'; "
+                "object-src 'none'"
+            )
+        return response
+
 
 class PhoneVerificationMiddleware:
     def __init__(self, get_response):

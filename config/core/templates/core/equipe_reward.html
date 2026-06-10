@@ -17,7 +17,7 @@
     <div class="referral-gradient rounded-2xl p-6 text-white shadow-lg">
         <div class="text-center mb-6">
             <h2 class="text-2xl font-bold mb-2">Mon Équipe</h2>
-            <p class="text-white text-opacity-80 text-sm">Gagnez sur 3 niveaux : 10% (Niv 1), 5% (Niv 2), 2% (Niv 3)</p>
+            <p class="text-white text-opacity-80 text-sm">Gagnez sur 3 niveaux : 10% (Niv 1), 5% (Niv 2), 2% (Niv 3) <span class="help-tip"><i class="fas fa-question-circle text-[10px] text-white/50"></i><span class="help-text">Quand votre filleul achète un VIP, vous gagnez 10% du montant. Son filleul (Niv 2) vous rapporte 5%, et le 3e niveau 2%.</span></span></p>
         </div>
         
         <div class="grid grid-cols-2 gap-4 mb-6">
@@ -39,24 +39,48 @@
             <div class="code-display text-3xl font-bold tracking-widest text-white">
                 {{ user.invitation_code }}
             </div>
+            {% if user.invitation_code %}
+            <img src="{% url 'qr_code' user.invitation_code %}" alt="QR Code" class="mx-auto mt-3 w-32 h-32 bg-white rounded-xl p-1">
+            {% endif %}
         </div>
-        
-        <div class="grid grid-cols-2 gap-3">
-            <button onclick="copyLink()" class="bg-white text-purple-700 font-bold py-3 rounded-xl shadow hover:bg-gray-100 transition active:scale-95">
-                <i class="fas fa-copy mr-2"></i> COPIER
+
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <button onclick="copyCode()" class="bg-white/20 backdrop-blur-sm text-white font-bold py-3 rounded-xl border border-white/20 hover:bg-white/30 transition active:scale-95 text-[10px]">
+                <i class="fas fa-copy mr-1"></i> CODE
             </button>
-            <button onclick="window.open('https://wa.me/?text=Gagnez de l\'argent chaque jour avec GainTime au Cameroun ! Rejoignez-moi ici : {{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}', '_blank')" class="bg-green-500 text-white font-bold py-3 rounded-xl shadow hover:bg-green-600 transition active:scale-95">
-                <i class="fab fa-whatsapp mr-2 text-lg"></i> PARTAGER
+            <button onclick="copyLink()" class="bg-white text-purple-700 font-bold py-3 rounded-xl shadow hover:bg-gray-100 transition active:scale-95 text-[10px]">
+                <i class="fas fa-link mr-1"></i> LIEN
             </button>
         </div>
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="window.open('https://wa.me/?text=Gagnez%20de%20l\'argent%20chaque%20jour%20avec%20GainTime%20au%20Cameroun%20!%20Rejoignez-moi%20ici%20:%20{{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}', '_blank')" class="bg-green-500 text-white font-bold py-3 rounded-xl shadow hover:bg-green-600 transition active:scale-95 text-[10px]">
+                <i class="fab fa-whatsapp mr-1"></i> WHATSAPP
+            </button>
+            <button onclick="window.open('tg://msg_url?url={{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}&text=Gagnez%20de%20l\'argent%20avec%20GainTime%20!%20Rejoignez-moi%20:', '_blank')" class="bg-blue-500 text-white font-bold py-3 rounded-xl shadow hover:bg-blue-600 transition active:scale-95 text-[10px]">
+                <i class="fab fa-telegram mr-1"></i> TELEGRAM
+            </button>
+        </div>
+        {% if navigator.share %}
+        <button onclick="nativeShare()" class="w-full mt-2 bg-white/10 backdrop-blur-sm text-white font-bold py-2.5 rounded-xl border border-white/20 hover:bg-white/20 transition active:scale-95 text-[10px]">
+            <i class="fas fa-share-nodes mr-1"></i> PARTAGER
+        </button>
+        {% endif %}
     </div>
 </section>
 
 <script>
+    const refLink = "{{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}";
+    const refCode = "{{ user.invitation_code }}";
     function copyLink() {
-        const link = "{{ request.scheme }}://{{ request.get_host }}{% url 'register' %}?ref={{ user.invitation_code }}";
-        navigator.clipboard.writeText(link);
-        alert("Lien complet copié !");
+        navigator.clipboard.writeText(refLink).then(() => alert("Lien copié !"));
+    }
+    function copyCode() {
+        navigator.clipboard.writeText(refCode).then(() => alert("Code copié !"));
+    }
+    function nativeShare() {
+        if (navigator.share) {
+            navigator.share({ title: 'GainTime', text: 'Gagnez de l\'argent avec GainTime !', url: refLink });
+        }
     }
 </script>
 

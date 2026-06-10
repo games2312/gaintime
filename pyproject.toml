@@ -1,0 +1,13 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "N"]
+ignore = ["E501", "E402"]
+
+[format]
+quote-style = "single"
+
+[tool.ruff.per-file-ignores]
+"config/core/migrations/*" = ["E", "F", "W", "UP"]

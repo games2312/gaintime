@@ -115,27 +115,29 @@
 
 {% block extra_js %}
 <script>
-    const orangeAccounts = [
-        {% for method in deposit_methods %}{% if method.operator == 'OM' %}
-        { name: "{{ method.name }}", number: "{{ method.number }}" },
-        {% endif %}{% endfor %}
-    ];
-
-    const mtnAccounts = [
-        {% for method in deposit_methods %}{% if method.operator == 'MOMO' %}
-        { name: "{{ method.name }}", number: "{{ method.number }}" },
-        {% endif %}{% endfor %}
-    ];
+    async function loadAccounts() {
+        try {
+            const res = await fetch('/api/v1/deposit-methods/', {
+                headers: {'Accept': 'application/json'}
+            });
+            if (!res.ok) return;
+            const methods = await res.json();
+            window.orangeAccounts = methods.filter(m => m.operator === 'OM');
+            window.mtnAccounts = methods.filter(m => m.operator === 'MOMO');
+            updatePaymentInfo();
+        } catch(e) {
+            console.warn('Impossible de charger les méthodes de dépôt');
+        }
+    }
 
     function updatePaymentInfo() {
         const method = document.querySelector('input[name="payment_method"]:checked').value;
         const nameEl = document.getElementById('dest-name');
         const numEl = document.getElementById('dest-number');
         
-        let accounts = method === 'OM' ? orangeAccounts : mtnAccounts;
+        let accounts = method === 'OM' ? (window.orangeAccounts || []) : (window.mtnAccounts || []);
         
         if (accounts.length > 0) {
-            // Choix aléatoire parmi la liste correspondante
             let selected = accounts[Math.floor(Math.random() * accounts.length)];
             nameEl.innerText = selected.name;
             numEl.innerText = selected.number;
@@ -154,9 +156,6 @@
         });
     });
 
-    // Initialisation au chargement
-    updatePaymentInfo();
-
     document.querySelectorAll('.amount-button').forEach(btn => {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.amount-button').forEach(b => b.classList.remove('selected'));
@@ -164,5 +163,7 @@
             document.getElementById('amount-input').value = this.dataset.amount;
         });
     });
+
+    loadAccounts();
 </script>
 {% endblock %}

@@ -2,26 +2,54 @@
 {% block title %}Dashboard Admin{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-blue-600 text-white rounded-2xl p-6 shadow-lg">
-        <p class="text-blue-100 text-sm font-bold uppercase">Solde Net Plateforme</p>
-        <p class="text-3xl font-black mt-2">{{ net_platform_balance|floatformat:0 }} F</p>
+<!-- Stats cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-blue-600 text-white rounded-2xl p-5 shadow-lg">
+        <p class="text-blue-100 text-[10px] font-bold uppercase">Solde Net</p>
+        <p class="text-2xl font-black mt-1">{{ net_platform_balance|floatformat:0 }} F</p>
     </div>
-    <div class="bg-green-600 text-white rounded-2xl p-6 shadow-lg">
-        <p class="text-green-100 text-sm font-bold uppercase">Profit Net (24h)</p>
-        <p class="text-3xl font-black mt-2">{{ net_profit_24h|floatformat:0 }} F</p>
+    <div class="bg-green-600 text-white rounded-2xl p-5 shadow-lg">
+        <p class="text-green-100 text-[10px] font-bold uppercase">Profit 24h</p>
+        <p class="text-2xl font-black mt-1">{{ net_profit_24h|floatformat:0 }} F</p>
     </div>
-    <div class="bg-purple-600 text-white rounded-2xl p-6 shadow-lg">
-        <p class="text-purple-100 text-sm font-bold uppercase">Total Dépôts</p>
-        <p class="text-3xl font-black mt-2">{{ total_deposited|floatformat:0 }} F</p>
+    <div class="bg-purple-600 text-white rounded-2xl p-5 shadow-lg">
+        <p class="text-purple-100 text-[10px] font-bold uppercase">Utilisateurs</p>
+        <p class="text-2xl font-black mt-1">{{ total_users }}</p>
+        <p class="text-[10px] text-purple-200">+{{ users_today }} aujourd'hui</p>
+    </div>
+    <div class="bg-amber-600 text-white rounded-2xl p-5 shadow-lg">
+        <p class="text-amber-100 text-[10px] font-bold uppercase">VIP Actifs</p>
+        <p class="text-2xl font-black mt-1">{{ active_vips }}</p>
+        <p class="text-[10px] text-amber-200">/ {{ total_users }} inscrits</p>
     </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Transactions en attente -->
-    <div class="bg-white rounded-xl shadow-sm border p-6">
-        <h2 class="font-bold text-gray-800 mb-4">Dépôts en attente ({{ pending_deposits.count }})</h2>
+<!-- Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm border p-5">
+        <h2 class="font-bold text-gray-800 text-sm mb-4">Inscriptions (7 jours)</h2>
+        <canvas id="usersChart" height="120"></canvas>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border p-5">
+        <h2 class="font-bold text-gray-800 text-sm mb-4">Revenus (7 jours)</h2>
+        <canvas id="revenueChart" height="120"></canvas>
+    </div>
+</div>
+
+<!-- Totaux & pending -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm border p-5">
+        <h2 class="font-bold text-gray-800 text-sm mb-4">Totaux</h2>
         <div class="space-y-3">
+            <div class="flex justify-between"><span class="text-gray-500 text-sm">Dépôts</span><span class="font-bold">{{ total_deposited|floatformat:0 }} F</span></div>
+            <div class="flex justify-between"><span class="text-gray-500 text-sm">Retraits</span><span class="font-bold">{{ total_withdrawn|floatformat:0 }} F</span></div>
+            <div class="flex justify-between"><span class="text-gray-500 text-sm">VIP vendus</span><span class="font-bold">{{ total_vip|floatformat:0 }} F</span></div>
+            <div class="flex justify-between border-t pt-2"><span class="font-bold text-gray-700">Nouveaux (7j)</span><span class="font-bold text-blue-600">+{{ new_users_7d }}</span></div>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border p-5">
+        <h2 class="font-bold text-gray-800 text-sm mb-4">Dépôts en attente ({{ pending_deposits.count }})</h2>
+        <div class="space-y-3 max-h-48 overflow-y-auto">
             {% for tx in pending_deposits|slice:":5" %}
             <div class="flex justify-between items-center border-b pb-2">
                 <div>
@@ -33,13 +61,12 @@
                     <a href="{% url 'admin_tx_update' tx.id 'approve' %}" class="text-[10px] text-green-600 font-bold">Valider</a>
                 </div>
             </div>
-            {% endfor %}
+            {% empty %}<p class="text-gray-400 text-sm text-center py-4">Aucun</p>{% endfor %}
         </div>
     </div>
-    
-    <div class="bg-white rounded-xl shadow-sm border p-6">
-        <h2 class="font-bold text-gray-800 mb-4">Retraits en attente ({{ pending_withdrawals.count }})</h2>
-        <div class="space-y-3">
+    <div class="bg-white rounded-xl shadow-sm border p-5">
+        <h2 class="font-bold text-gray-800 text-sm mb-4">Retraits en attente ({{ pending_withdrawals.count }})</h2>
+        <div class="space-y-3 max-h-48 overflow-y-auto">
             {% for tx in pending_withdrawals|slice:":5" %}
             <div class="flex justify-between items-center border-b pb-2">
                 <div>
@@ -51,8 +78,55 @@
                     <a href="{% url 'admin_tx_update' tx.id 'approve' %}" class="text-[10px] text-green-600 font-bold">Payer</a>
                 </div>
             </div>
-            {% endfor %}
+            {% empty %}<p class="text-gray-400 text-sm text-center py-4">Aucun</p>{% endfor %}
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const labels = {{ chart_labels|safe }};
+new Chart(document.getElementById('usersChart'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Inscriptions',
+            data: {{ chart_users|safe }},
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+});
+new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Revenus (Dépôts + VIP)',
+            data: {{ chart_revenue|safe }},
+            backgroundColor: 'rgba(16,185,129,0.7)',
+            borderColor: '#10b981',
+            borderWidth: 1,
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
 {% endblock %}

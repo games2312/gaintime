@@ -1,6 +1,7 @@
 .git
 .gitignore
 .env
+.env.prod
 *.pyc
 __pycache__/
 reward/
@@ -10,4 +11,7 @@ staticfiles/
 .dockerignore
 Dockerfile
 docker-compose.yml
+docker-compose.prod.yml
 README.md
+nginx/ssl/
+scripts/

@@ -9,9 +9,12 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.views import LoginView
-from django.db import models
+from django.db import models, transaction
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Sum, Count
+from django.db.models.functions import TruncDate
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -20,11 +23,11 @@ from django_ratelimit.decorators import ratelimit
 
 from .forms import RegisterForm, LoginForm, TaskForm, VIPLevelForm
 from .models import (
-    Badge, Boost, CustomUser, DailyMission, DepositMethod, FAQ,
+    Announcement, Badge, Boost, CustomUser, DailyMission, DepositMethod, FAQ,
     MiningSession, Notification, SupportTicket, Task, Transaction,
     UserBadge, UserMissionProgress, UserTaskCompletion, VIPLevel,
 )
-from .utils import compute_phash, get_client_ip, hamming_distance
+from .utils import award_xp, check_referral_tiers, compute_phash, get_client_ip, hamming_distance, update_mission_progress, validate_image_magic_bytes, LEVEL_THRESHOLDS
 
 logger = logging.getLogger(__name__)
 
@@ -130,8 +133,7 @@ def register_view(request):
             user.registration_ip = client_ip
             user.last_ip = client_ip
             user.device_fingerprint = request.POST.get('device_fingerprint', '')[:128]
-
-            user.otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            user.is_phone_verified = True
             user.save()
             
             free_level = VIPLevel.objects.filter(price=0).first()
@@ -141,19 +143,12 @@ def register_view(request):
 
             if user.referred_by:
                 referrer = user.referred_by
-                referrer.total_referrals = CustomUser.objects.filter(referred_by=referrer).count()
-                if referrer.total_referrals >= 100:
-                    referrer.referral_tier = 3
-                elif referrer.total_referrals >= 20:
-                    referrer.referral_tier = 2
-                elif referrer.total_referrals >= 5:
-                    referrer.referral_tier = 1
-                referrer.save()
+                check_referral_tiers(referrer)
             
-            messages.success(request, "Inscription réussie ! Veuillez vérifier votre numéro.")
-            # On connecte l'utilisateur pour qu'il puisse accéder à la page de vérification
+            award_xp(user, 20, "Inscription")
+            messages.success(request, "Inscription réussie !")
             login(request, user)
-            return redirect('verify_phone')
+            return redirect('dashboard')
     else:
         form = RegisterForm(initial={'invitation_code_input': request.GET.get('ref', '')})
     return render(request, 'core/inscription_reward.html', {'form': form})
@@ -184,8 +179,12 @@ def logout_view(request):
 
 @login_required
 def dashboard(request):
-    active_session = MiningSession.objects.filter(user=request.user, is_active=True).first()
     today = timezone.now().date()
+    if request.session.get('visited_today') != str(today):
+        request.session['visited_today'] = str(today)
+        update_mission_progress(request.user, 'VISIT')
+    
+    active_session = MiningSession.objects.filter(user=request.user, is_active=True).first()
     
     # On calcule la somme de TOUS les gains de la journée
     reward_types = ['MINING_REWARD', 'TASK_REWARD', 'REFERRAL_BONUS', 'DAILY_CHECKIN', 'SPIN_WIN']
@@ -218,7 +217,7 @@ def dashboard(request):
         transaction_type__in=reward_types,
         status='COMPLETED',
         created_at__date__gte=seven_days_ago
-    ).extra(select={'day': "date(created_at)"}).values('day').annotate(total=models.Sum('amount')).order_by('day')
+    ).annotate(day=TruncDate('created_at')).values('day').annotate(total=models.Sum('amount')).order_by('day')
     
     # Préparation des labels et données pour Chart.js
     graph_labels = []
@@ -231,6 +230,15 @@ def dashboard(request):
         graph_labels.append(day.strftime('%d/%m'))
         graph_data.append(stats_dict.get(day_str, 0))
 
+    weekly_total = sum(graph_data)
+
+    user_level = request.user.level
+    next_xp = None
+    for lvl, needed in sorted(LEVEL_THRESHOLDS.items()):
+        if lvl > user_level:
+            next_xp = needed
+            break
+
     context = {
         'active_session': active_session,
         'remaining_seconds': remaining_seconds,
@@ -239,8 +247,10 @@ def dashboard(request):
         'total_tasks': request.user.vip_level.daily_task_limit if request.user.vip_level else 2,
         'mining_completed': mining_completed,
         'today_date': today,
+        'weekly_total': weekly_total,
         'graph_labels': graph_labels,
         'graph_data': graph_data,
+        'next_level_xp': next_xp,
     }
     return render(request, 'core/dashboard_reward.html', context)
 
@@ -410,8 +420,36 @@ def profile_view(request):
 
 @login_required
 def wallet_view(request):
-    transactions = Transaction.objects.filter(user=request.user).order_by('-created_at')
-    return render(request, 'core/portefeuille.html', {'transactions': transactions})
+    tx_filter = Transaction.objects.filter(user=request.user)
+    tx_type = request.GET.get('type', '')
+    tx_status = request.GET.get('status', '')
+    tx_q = request.GET.get('q', '').strip()
+    type_choices = dict(Transaction.TYPE_CHOICES)
+    if tx_type in type_choices:
+        tx_filter = tx_filter.filter(transaction_type=tx_type)
+    if tx_status in ['PENDING', 'COMPLETED', 'REJECTED']:
+        tx_filter = tx_filter.filter(status=tx_status)
+    if tx_q:
+        tx_filter = tx_filter.filter(
+            models.Q(description__icontains=tx_q) |
+            models.Q(reference_id__icontains=tx_q) |
+            models.Q(amount__icontains=tx_q)
+        )
+    paginator = Paginator(tx_filter.order_by('-created_at'), 20)
+    page = request.GET.get('page', 1)
+    try:
+        transactions = paginator.page(page)
+    except PageNotAnInteger:
+        transactions = paginator.page(1)
+    except EmptyPage:
+        transactions = paginator.page(paginator.num_pages)
+    return render(request, 'core/portefeuille.html', {
+        'transactions': transactions,
+        'filter_type': tx_type,
+        'filter_status': tx_status,
+        'search_q': tx_q,
+        'tx_type_choices': Transaction.TYPE_CHOICES,
+    })
 
 @login_required
 def communaute_view(request):
@@ -503,6 +541,7 @@ def spin_wheel(request):
             user.last_spin_time = now
             
         user.save()
+        update_mission_progress(user, 'SPIN_WHEEL')
         
         return JsonResponse({
             'success': True, 
@@ -552,14 +591,22 @@ def buy_boost(request, boost_id):
 @login_required
 def referral_program_view(request):
     tiers = [
-        {'level': 1, 'needed': 5, 'bonus': '+1% commission'},
-        {'level': 2, 'needed': 20, 'bonus': '+2% commission + groupe Telegram'},
-        {'level': 3, 'needed': 100, 'bonus': '+5% commission + cashback VIP'},
+        {'level': 1, 'needed': 3, 'bonus': '+1% commission sur achats VIP des filleuls', 'reward': 500},
+        {'level': 2, 'needed': 10, 'bonus': '+2% commission + accès groupe Telegram privé', 'reward': 2000},
+        {'level': 3, 'needed': 25, 'bonus': '+3% commission + badge exclusif', 'reward': 5000},
+        {'level': 4, 'needed': 50, 'bonus': '+4% commission + retrait prioritaire', 'reward': 15000},
+        {'level': 5, 'needed': 100, 'bonus': '+5% commission + cashback VIP 50%', 'reward': 50000},
     ]
+    referral_earnings = Transaction.objects.filter(
+        user=request.user, transaction_type='REFERRAL_BONUS', status='COMPLETED'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    top_referrers = CustomUser.objects.filter(total_referrals__gt=0).order_by('-total_referrals')[:20]
     return render(request, 'core/referral_program.html', {
         'tiers': tiers,
         'current_tier': request.user.referral_tier,
         'total_referrals': request.user.total_referrals,
+        'referral_earnings': referral_earnings,
+        'top_referrers': top_referrers,
     })
 
 
@@ -643,6 +690,11 @@ def check_badge_unlocks(user):
                     description=f"Badge débloqué: {badge.name}"
                 )
             user.save()
+            try:
+                from .tasks import send_push_badge_unlocked
+                send_push_badge_unlocked.delay(user.id, badge.name)
+            except Exception:
+                pass
 
 
 def offline_view(request):
@@ -760,6 +812,8 @@ def daily_check_in(request):
         user.last_check_in = today
         user.save()
         Transaction.objects.create(user=user, amount=amount, transaction_type='DAILY_CHECKIN', status='COMPLETED', description=f"Bonus jour {user.check_in_streak}")
+        update_mission_progress(user, 'CHECK_IN')
+        award_xp(user, 10, "Check-in quotidien")
         messages.success(request, f"+{amount} FCFA !")
     return redirect('dashboard')
 
@@ -769,7 +823,11 @@ def start_mining(request):
         if MiningSession.objects.filter(user=request.user, is_active=True).exists():
             messages.error(request, "Déjà en cours.")
         else:
-            MiningSession.objects.create(user=request.user)
+            MiningSession.objects.create(
+                user=request.user,
+                end_time=timezone.now() + timezone.timedelta(hours=MiningSession.DURATION_HOURS)
+            )
+            update_mission_progress(request.user, 'MINE')
             if not request.user.has_triggered_referral_bonus and request.user.referred_by:
                 now = timezone.now()
                 hours_since_reg = (now - request.user.date_joined).total_seconds() / 3600
@@ -811,10 +869,14 @@ def claim_mining(request):
             session.earned_amount = amount
             session.save()
             Transaction.objects.create(user=request.user, amount=amount, transaction_type='MINING_REWARD', status='COMPLETED', description=f"Gain minage {user_level.name}")
+            award_xp(request.user, 15, "Minage terminé")
+            from .utils import send_push_notification
+            send_push_notification(request.user, "Minage terminé", f"+{amount} F gagnés ! Lancez une nouvelle session de 4h.", url=reverse('mining'))
             messages.success(request, f"Gain de {amount} FCFA réclamé !")
     return redirect('dashboard')
 
 @login_required
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
 def complete_task(request, task_id):
     task = get_object_or_404(Task, id=task_id)
     user_level = request.user.vip_level or VIPLevel.objects.filter(price=0).first()
@@ -833,10 +895,10 @@ def complete_task(request, task_id):
             
         if not screenshot:
             messages.error(request, "Capture manquante.")
-        elif screenshot.content_type not in ['image/jpeg', 'image/png', 'image/webp']:
-            messages.error(request, "Format de fichier non supporté. Utilisez JPG, PNG ou WebP.")
         elif screenshot.size > 5 * 1024 * 1024:
             messages.error(request, "Fichier trop volumineux. Maximum 5 Mo.")
+        elif not validate_image_magic_bytes(screenshot):
+            messages.error(request, "Format de fichier non supporté ou fichier corrompu.")
         else:
             img_hash = compute_phash(screenshot)
 
@@ -857,6 +919,7 @@ def complete_task(request, task_id):
                 image_hash=img_hash,
                 status='PENDING'
             )
+            update_mission_progress(request.user, 'COMPLETE_TASKS')
             messages.success(request, "Preuve envoyée, en attente de validation.")
     return redirect('tasks')
 
@@ -913,11 +976,8 @@ def claim_auto_task(request, task_id):
         user_level = request.user.vip_level or VIPLevel.objects.filter(price=0).first()
         reward = user_level.task_reward_rate
 
-        completion.status = 'APPROVED'
+        completion.status = 'PENDING'
         completion.save()
-
-        request.user.balance += reward
-        request.user.save()
 
         Transaction.objects.create(
             user=request.user,
@@ -926,7 +986,7 @@ def claim_auto_task(request, task_id):
             status='COMPLETED',
             description=f"Gain Timer : {task.title}"
         )
-        messages.success(request, f"Félicitations ! +{reward} FCFA ajoutés.")
+        messages.success(request, f"Tâche terminée ! En attente de validation par l'admin.")
 
     return redirect('tasks')
 
@@ -938,6 +998,7 @@ def finish_onboarding(request):
         return JsonResponse({'success': True})
     return redirect('dashboard')
 @login_required
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def deposit_view(request):
     if request.method == 'POST':
         amount = request.POST.get('amount')
@@ -945,28 +1006,36 @@ def deposit_view(request):
         reference = request.POST.get('reference')
         proof_image = request.FILES.get('proof_image')
         
+        from .utils import validate_image_magic_bytes
+
         if not proof_image or not sender_phone or not reference:
             messages.error(request, "Veuillez remplir tous les champs et fournir la preuve.")
-            return redirect('deposit')
-
-        if proof_image.content_type not in ['image/jpeg', 'image/png', 'image/webp']:
-            messages.error(request, "Format de fichier non supporté. Utilisez JPG, PNG ou WebP.")
             return redirect('deposit')
 
         if proof_image.size > 5 * 1024 * 1024:
             messages.error(request, "Fichier trop volumineux. Maximum 5 Mo.")
             return redirect('deposit')
 
-        if amount and int(amount) >= 500:
+        if not validate_image_magic_bytes(proof_image):
+            messages.error(request, "Format de fichier non supporté ou fichier corrompu.")
+            return redirect('deposit')
+
+        try:
+            deposit_amount = int(amount)
+        except (ValueError, TypeError):
+            messages.error(request, "Montant invalide.")
+            return redirect('deposit')
+
+        if deposit_amount >= 500:
             Transaction.objects.create(
                 user=request.user, 
-                amount=amount, 
+                amount=Decimal(str(deposit_amount)), 
                 transaction_type='DEPOSIT', 
                 status='PENDING', 
                 payment_method=request.POST.get('payment_method'), 
                 reference_id=reference,
                 proof_image=proof_image,
-                description=f"Dépôt de {amount} F via {sender_phone} (Ref: {reference})"
+                description=f"Dépôt de {deposit_amount} F via {sender_phone} (Ref: {reference})"
             )
             messages.success(request, "Dépôt en attente de validation.")
             return redirect('dashboard')
@@ -975,6 +1044,7 @@ def deposit_view(request):
     return render(request, 'core/depot_reward.html', {'deposit_methods': deposit_methods})
 
 @login_required
+@ratelimit(key='ip', rate='3/m', method='POST', block=True)
 def withdraw_view(request):
     user = request.user
     
@@ -986,42 +1056,50 @@ def withdraw_view(request):
     if request.method == 'POST':
         try:
             amount = Decimal(request.POST.get('amount', '0'))
-        except:
+        except Exception:
             amount = Decimal('0')
-            
-        # Limite journalière de 50 000 F
-        today = timezone.now().date()
-        today_withdrawals = Transaction.objects.filter(
-            user=user, transaction_type='WITHDRAWAL', status__in=['PENDING', 'COMPLETED'], 
-            created_at__date=today
-        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-        
-        if today_withdrawals + amount > Decimal('50000'):
-            messages.error(request, "Limite de retrait journalière de 50 000 F atteinte.")
+
+        if amount < Decimal('1000'):
+            messages.error(request, "Montant minimum de retrait : 1 000 F.")
             return redirect('withdraw')
 
-        phone_number = request.POST.get('phone_number')
-        
-        # SÉCURITÉ : Vérification du numéro verrouillé
-        if user.withdrawal_phone_locked and user.withdrawal_phone_locked != phone_number:
-            messages.error(request, f"Accès refusé. Vos retraits sont verrouillés sur le numéro {user.withdrawal_phone_locked}. Contactez le support.")
-            return redirect('withdraw')
+        with transaction.atomic():
+            user = CustomUser.objects.select_for_update().get(id=request.user.id)
 
-        if user.balance >= amount and amount >= Decimal('1000'):
-            # On verrouille le numéro s'il ne l'est pas encore
+            today = timezone.now().date()
+            today_withdrawals = Transaction.objects.filter(
+                user=user, transaction_type='WITHDRAWAL', status__in=['PENDING', 'COMPLETED'],
+                created_at__date=today
+            ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+
+            if today_withdrawals + amount > Decimal('50000'):
+                messages.error(request, "Limite de retrait journalière de 50 000 F atteinte.")
+                return redirect('withdraw')
+
+            phone_number = request.POST.get('phone_number')
+
+            if user.withdrawal_phone_locked and user.withdrawal_phone_locked != phone_number:
+                messages.error(request, f"Accès refusé. Vos retraits sont verrouillés sur le numéro {user.withdrawal_phone_locked}. Contactez le support.")
+                return redirect('withdraw')
+
+            if user.balance < amount:
+                messages.error(request, "Solde insuffisant.")
+                return redirect('withdraw')
+
             if not user.withdrawal_phone_locked:
                 user.withdrawal_phone_locked = phone_number
-                
-            Transaction.objects.create(
-                user=user, amount=amount, transaction_type='WITHDRAWAL', 
-                status='PENDING', payment_method=request.POST.get('payment_method'), 
-                description=f"Retrait vers {phone_number}"
-            )
+
             user.balance -= amount
             user.save()
+
+            Transaction.objects.create(
+                user=user, amount=amount, transaction_type='WITHDRAWAL',
+                status='PENDING', payment_method=request.POST.get('payment_method'),
+                description=f"Retrait vers {phone_number}"
+            )
+
             messages.success(request, "Demande envoyée. Votre numéro de retrait est désormais verrouillé.")
             return redirect('dashboard')
-        messages.error(request, "Erreur solde ou montant.")
     return render(request, 'core/retrait_reward.html')
 
 # --- ESPACE ADMIN ---
@@ -1047,6 +1125,7 @@ def admin_dashboard(request):
     try:
         today = timezone.now().date()
         yesterday = timezone.now() - timezone.timedelta(days=1)
+        seven_days_ago = timezone.now() - timezone.timedelta(days=7)
         
         # Statistiques 24h
         deposits_24h = Transaction.objects.filter(transaction_type='DEPOSIT', status='COMPLETED', created_at__gte=yesterday).aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -1056,6 +1135,37 @@ def admin_dashboard(request):
         # Totaux globaux
         total_deposits = Transaction.objects.filter(transaction_type='DEPOSIT', status='COMPLETED').aggregate(total=Sum('amount'))['total'] or Decimal('0')
         total_withdrawals = Transaction.objects.filter(transaction_type='WITHDRAWAL', status='COMPLETED').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        total_vip = Transaction.objects.filter(transaction_type='VIP_PURCHASE', status='COMPLETED').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        # Utilisateurs
+        total_users = CustomUser.objects.count()
+        new_users_7d = CustomUser.objects.filter(created_at__gte=seven_days_ago).count()
+        users_today = CustomUser.objects.filter(created_at__date=today).count()
+        active_vips = CustomUser.objects.filter(vip_level__price__gt=0, vip_expiry_date__gte=timezone.now()).count()
+        
+        # Graphique 7 jours : inscriptions
+        daily_users = []
+        daily_revenue = []
+        daily_labels = []
+        for i in range(6, -1, -1):
+            day = timezone.now() - timezone.timedelta(days=i)
+            daily_labels.append(day.strftime('%d/%m'))
+            day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timezone.timedelta(days=1)
+            daily_users.append(CustomUser.objects.filter(created_at__gte=day_start, created_at__lt=day_end).count())
+            rev = Transaction.objects.filter(
+                transaction_type__in=['DEPOSIT', 'VIP_PURCHASE'],
+                status='COMPLETED',
+                created_at__gte=day_start, created_at__lt=day_end
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            daily_revenue.append(float(rev))
+        
+        # Transactions par type
+        tx_counts = Transaction.objects.values('transaction_type').annotate(total=Sum('amount')).filter(status='COMPLETED')
+        tx_by_type = {t['transaction_type']: float(t['total']) for t in tx_counts}
+        
+        # Niveaux VIP
+        vip_counts = list(VIPLevel.objects.annotate(count=Count('customuser')).values('name', 'count', 'price'))
         
         context = {
             'pending_deposits': Transaction.objects.filter(transaction_type='DEPOSIT', status='PENDING'),
@@ -1063,6 +1173,17 @@ def admin_dashboard(request):
             'net_platform_balance': total_deposits - total_withdrawals,
             'net_profit_24h': deposits_24h + vip_sales_24h - withdrawals_24h,
             'total_deposited': total_deposits,
+            'total_withdrawn': total_withdrawals,
+            'total_vip': total_vip,
+            'total_users': total_users,
+            'new_users_7d': new_users_7d,
+            'users_today': users_today,
+            'active_vips': active_vips,
+            'chart_labels': json.dumps(daily_labels),
+            'chart_users': json.dumps(daily_users),
+            'chart_revenue': json.dumps(daily_revenue),
+            'tx_by_type': json.dumps(tx_by_type),
+            'vip_counts': vip_counts,
         }
         return render(request, 'core/admin/dashboard.html', context)
     except Exception as e:
@@ -1082,8 +1203,9 @@ def admin_update_transaction(request, tx_id, action):
             if tx.transaction_type == 'DEPOSIT':
                 tx.user.balance += tx.amount
                 tx.user.total_earnings += tx.amount
-                tx.user.is_verified = True # Un premier dépôt vérifie le compte
+                tx.user.is_verified = True
                 tx.user.save()
+                award_xp(tx.user, 30, f"Dépôt de {tx.amount} F")
                 Notification.objects.create(user=tx.user, title="Dépôt Validé", message=f"Votre dépôt de {tx.amount} F a été approuvé.")
             tx.status = 'COMPLETED'
         elif action == 'reject':
@@ -1142,9 +1264,17 @@ def admin_quick_edit_balance(request, user_id):
         
         if action == 'add':
             user.balance += amount
+            Transaction.objects.create(
+                user=user, amount=amount, transaction_type='DEPOSIT',
+                status='COMPLETED', description=f"Ajustement admin: +{amount} F"
+            )
             messages.success(request, f"{amount} F ajoutés à {user.username}")
         elif action == 'sub':
             user.balance -= amount
+            Transaction.objects.create(
+                user=user, amount=amount, transaction_type='WITHDRAWAL',
+                status='COMPLETED', description=f"Ajustement admin: -{amount} F"
+            )
             messages.warning(request, f"{amount} F retirés à {user.username}")
         
         user.save()
@@ -1165,6 +1295,7 @@ def admin_update_task_status(request, completion_id, action):
             completion.user.total_earnings += reward
             completion.user.save()
             Transaction.objects.create(user=completion.user, amount=reward, transaction_type='TASK_REWARD', status='COMPLETED', description=f"Tâche validée : {completion.task.title}")
+            award_xp(completion.user, 20, f"Tâche : {completion.task.title}")
             Notification.objects.create(user=completion.user, title="Tâche Validée", message=f"+{reward} F pour {completion.task.title}")
         else:
             completion.status = 'REJECTED'
@@ -1207,10 +1338,15 @@ def verify_phone_view(request):
         
     if request.method == 'POST':
         code = request.POST.get('otp_code')
-        if request.user.otp_code and code == request.user.otp_code:
-            request.user.is_phone_verified = True
-            request.user.otp_code = None
-            request.user.save()
+        user = request.user
+        if user.otp_code and user.otp_created_at and check_password(code, user.otp_code):
+            if timezone.now() - user.otp_created_at > timezone.timedelta(minutes=10):
+                messages.error(request, "Code expiré. Veuillez redemander.")
+                return redirect('verify_phone')
+            user.is_phone_verified = True
+            user.otp_code = None
+            user.otp_created_at = None
+            user.save()
             messages.success(request, "Numéro vérifié avec succès !")
             return redirect('dashboard')
         else:
@@ -1224,7 +1360,9 @@ def forgot_password_view(request):
         phone = request.POST.get('phone_number')
         user = CustomUser.objects.filter(phone_number=phone).first()
         if user:
-            user.otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            raw_otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            user.otp_code = make_password(raw_otp)
+            user.otp_created_at = timezone.now()
             user.save()
             messages.success(request, "Un code de réinitialisation a été généré. Veuillez contacter le bot Telegram.")
             request.session['reset_phone'] = phone
@@ -1243,9 +1381,13 @@ def reset_password_view(request):
     if request.method == 'POST':
         code = request.POST.get('otp_code')
         new_password = request.POST.get('new_password')
-        if user.otp_code and code == user.otp_code:
+        if user.otp_code and user.otp_created_at and check_password(code, user.otp_code):
+            if timezone.now() - user.otp_created_at > timezone.timedelta(minutes=10):
+                messages.error(request, "Code expiré. Veuillez recommencer.")
+                return redirect('forgot_password')
             user.set_password(new_password)
             user.otp_code = None
+            user.otp_created_at = None
             user.save()
             del request.session['reset_phone']
             messages.success(request, "Mot de passe réinitialisé avec succès !")
@@ -1303,3 +1445,55 @@ def admin_reply_ticket(request, ticket_id):
             messages.success(request, "Réponse envoyée !")
             
     return redirect('admin_support')
+
+import io
+import qrcode
+from django.http import HttpResponse
+from django.urls import reverse
+
+def qr_code_view(request, code):
+    qr = qrcode.make(f"{request.scheme}://{request.get_host()}{reverse('register')}?ref={code}")
+    buf = io.BytesIO()
+    qr.save(buf, format='PNG')
+    buf.seek(0)
+    return HttpResponse(buf.getvalue(), content_type='image/png')
+
+@staff_member_required(login_url='/management/login/')
+def admin_announcements(request):
+    announcements = Announcement.objects.all().order_by('-created_at')
+    return render(request, 'core/admin/announcements.html', {'announcements': announcements})
+
+@staff_member_required(login_url='/management/login/')
+def admin_add_announcement(request):
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        message = request.POST.get('message')
+        link = request.POST.get('link', '')
+        if title and message:
+            Announcement.objects.create(title=title, message=message, link=link or None)
+            messages.success(request, "Annonce créée.")
+        else:
+            messages.error(request, "Titre et message requis.")
+        return redirect('admin_announcements')
+    return render(request, 'core/admin/add_announcement.html')
+
+@staff_member_required(login_url='/management/login/')
+def admin_toggle_announcement(request, ann_id):
+    ann = get_object_or_404(Announcement, id=ann_id)
+    ann.is_active = not ann.is_active
+    ann.save()
+    return redirect('admin_announcements')
+
+@staff_member_required(login_url='/management/login/')
+def admin_delete_announcement(request, ann_id):
+    ann = get_object_or_404(Announcement, id=ann_id)
+    ann.delete()
+    return redirect('admin_announcements')
+
+@login_required
+@require_POST
+def theme_api_view(request):
+    theme = request.POST.get('theme', 'dark')
+    request.user.dark_mode = (theme == 'dark')
+    request.user.save(update_fields=['dark_mode'])
+    return JsonResponse({'ok': True})

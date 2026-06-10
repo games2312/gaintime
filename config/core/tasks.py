@@ -111,3 +111,45 @@ def remind_inactive_users():
 
     logger.info(f"Rappel envoyé à {count} utilisateurs inactifs")
     return count
+
+
+@shared_task
+def send_push_badge_unlocked(user_id, badge_name):
+    from .models import CustomUser
+    from .utils import send_push_notification
+
+    user = CustomUser.objects.get(id=user_id)
+    send_push_notification(
+        user,
+        "Badge débloqué ! 🏆",
+        f"Tu viens de débloquer le badge : {badge_name}",
+        url='/gamification/',
+    )
+
+
+@shared_task
+def send_push_mission_complete(user_id, mission_name, reward):
+    from .models import CustomUser
+    from .utils import send_push_notification
+
+    user = CustomUser.objects.get(id=user_id)
+    send_push_notification(
+        user,
+        "Mission accomplie ! ✅",
+        f"Mission '{mission_name}' terminée — +{reward} FCFA",
+        url='/gamification/',
+    )
+
+
+@shared_task
+def send_push_mining_complete(user_id, amount):
+    from .models import CustomUser
+    from .utils import send_push_notification
+
+    user = CustomUser.objects.get(id=user_id)
+    send_push_notification(
+        user,
+        "Minage terminé ! ⛏️",
+        f"Ton minage est prêt — réclame {amount} FCFA maintenant !",
+        url='/dashboard/',
+    )

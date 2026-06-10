@@ -48,8 +48,8 @@ self.addEventListener('push', (e) => {
     try { data = e.data.json(); } catch { data = { title: 'GainTime', body: e.data.text() }; }
     const opts = {
         body: data.body || '',
-        icon: data.icon || '/static/core/img/icon-192.png',
-        badge: '/static/core/img/badge-72.png',
+        icon: data.icon || '/static/core/img/icon-512.svg',
+        badge: '/static/core/img/badge-72.svg',
         vibrate: [200, 100, 200],
         data: { url: data.url || '/' },
         actions: data.actions || [],

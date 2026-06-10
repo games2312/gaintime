@@ -9,7 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CustomUser, Task, Transaction, VIPLevel
+from .models import CustomUser, DepositMethod, Task, Transaction, VIPLevel
 
 
 def health_check(request):
@@ -97,3 +97,18 @@ class VIPLevelViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = VIPLevel.objects.all().order_by('price')
     serializer_class = VIPLevelSerializer
     permission_classes = [permissions.AllowAny]
+
+
+class DepositMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DepositMethod
+        fields = ['operator', 'name', 'number']
+
+
+class DepositMethodView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        methods = DepositMethod.objects.filter(is_active=True)
+        serializer = DepositMethodSerializer(methods, many=True)
+        return Response(serializer.data)

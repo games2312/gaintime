@@ -8,13 +8,11 @@ daphne==4.2.1
 dj-database-url==3.1.2
 Django==6.0.1
 django-health-check==4.4.1
-django-imagekit==5.1.0
 django-ratelimit==4.1.0
 django-redis==6.0.0
 djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
 drf-spectacular==0.29.0
-gunicorn==23.0.0
 h11==0.16.0
 packaging==25.0
 Pillow==12.2.0
@@ -25,3 +23,4 @@ sentry-sdk==2.61.0
 sqlparse==0.5.5
 uvicorn==0.42.0
 whitenoise==6.12.0
+pywebpush==1.14.1

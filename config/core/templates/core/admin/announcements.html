@@ -1,0 +1,29 @@
+{% extends 'core/admin/admin_base.html' %}
+{% block title %}Annonces - Admin{% endblock %}
+{% block content %}
+<div class="mb-6 mt-4 flex justify-between items-center px-2">
+    <h2 class="text-xl font-bold text-gray-800">Annonces</h2>
+    <a href="{% url 'admin_add_announcement' %}" class="bg-red-600 text-white p-3 rounded-2xl shadow-lg shadow-red-200"><i class="fas fa-plus"></i></a>
+</div>
+<div class="space-y-4 px-2">
+    {% for a in announcements %}
+    <div class="bg-white rounded-3xl p-5 shadow-soft border border-gray-100">
+        <div class="flex justify-between items-start mb-2">
+            <h3 class="font-bold text-gray-800">{{ a.title }}</h3>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {% if a.is_active %}bg-green-100 text-green-600{% else %}bg-gray-100 text-gray-600{% endif %}">
+                {{ a.is_active|yesno:"Actif,Inactif" }}
+            </span>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">{{ a.message|truncatewords:30 }}</p>
+        <div class="flex gap-2 border-t border-gray-50 pt-3">
+            <a href="{% url 'admin_toggle_announcement' a.id %}" class="text-[10px] font-bold px-3 py-1.5 rounded-xl {% if a.is_active %}bg-amber-100 text-amber-600{% else %}bg-green-100 text-green-600{% endif %}">
+                {{ a.is_active|yesco:"Désactiver,Activer" }}
+            </a>
+            <a href="{% url 'admin_delete_announcement' a.id %}" onclick="return confirm('Supprimer cette annonce ?')" class="text-[10px] font-bold px-3 py-1.5 rounded-xl bg-red-50 text-red-600">Supprimer</a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-20 text-gray-400 text-sm">Aucune annonce.</div>
+    {% endfor %}
+</div>
+{% endblock %}

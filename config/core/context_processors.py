@@ -1,8 +1,15 @@
 import random
-from .models import Transaction, CustomUser
+from .models import Announcement, Transaction, CustomUser
 from django.db.models import Q
 
 def live_activity(request):
+    announcements = Announcement.objects.filter(is_active=True)[:1]
+    ctx = {'live_activities': _get_activities(), 'active_announcement': announcements.first() if announcements else None}
+    if request.user.is_authenticated:
+        ctx['unread_count'] = request.user.notifications.filter(is_read=False).count()
+    return ctx
+
+def _get_activities():
     """
     Génère un flux d'activité mélangé (Réel + Fictif) avec style camerounais.
     """
@@ -53,4 +60,4 @@ def live_activity(request):
     # Mélanger pour que le réel et le faux soient entremêlés
     random.shuffle(activities)
     
-    return {'live_activities': activities}
+    return activities

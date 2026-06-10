@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import (
-    Badge, Boost, CustomUser, DailyMission, DepositMethod, FAQ,
+    Announcement, Badge, Boost, CustomUser, DailyMission, DepositMethod, FAQ,
     MiningSession, Notification, PushSubscription, SupportTicket,
     Task, Transaction, UserBadge, UserMissionProgress, UserTaskCompletion,
     VIPLevel,
@@ -139,3 +139,9 @@ class SupportTicketAdmin(admin.ModelAdmin):
     list_display = ('user', 'subject', 'status', 'created_at')
     list_filter = ('status', 'created_at')
     search_fields = ('user__username', 'subject')
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ('title', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'message')

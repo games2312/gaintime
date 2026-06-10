@@ -15,4 +15,5 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('me/', api_views.MeView.as_view(), name='api_me'),
     path('leaderboard/', api_views.LeaderboardView.as_view(), name='api_leaderboard'),
+    path('deposit-methods/', api_views.DepositMethodView.as_view(), name='api_deposit_methods'),
 ] + router.urls

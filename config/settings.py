@@ -28,7 +28,9 @@ if os.path.exists(env_path):
                 os.environ[key] = value
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-change-me')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    raise RuntimeError('La variable SECRET_KEY est obligatoire en production.')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
@@ -60,6 +62,7 @@ CSRF_TRUSTED_ORIGINS += ['http://127.0.0.1:8000', 'http://localhost:8000']
 # --- SÉCURITÉ DES COOKIES ---
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -104,7 +107,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'core.middleware.PhoneVerificationMiddleware',
+    'core.middleware.ContentSecurityPolicyMiddleware',
     'core.middleware.VIPExpiryMiddleware',
 ]
 
@@ -240,11 +243,22 @@ CHANNEL_LAYERS = {
     },
 }
 
+# --- VAPID (Web Push) ---
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_CLAIM_EMAIL = os.environ.get('VAPID_CLAIM_EMAIL', 'admin@gaintime.com')
+
 # --- CELERY ---
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_EAGER', 'False') == 'True'
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_WORKER_CONCURRENCY = int(os.environ.get('CELERY_WORKER_CONCURRENCY', '4'))
+CELERY_WORKER_MAX_TASKS_PER_CHILD = int(os.environ.get('CELERY_WORKER_MAX_TASKS_PER_CHILD', '1000'))
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.environ.get('CELERY_TASK_SOFT_TIME_LIMIT', '300'))
+CELERY_TASK_TIME_LIMIT = int(os.environ.get('CELERY_TASK_TIME_LIMIT', '600'))
 CELERY_BEAT_SCHEDULE = {
     'vip-expiry-check': {
         'task': 'core.tasks.check_vip_expirations',
@@ -269,6 +283,14 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 # --- LOGGING ---
+# En production (Docker), on log UNIQUEMENT sur la console (12-factor app)
+# Le fichier django.log est utilisé seulement hors Docker
+LOG_TO_FILE = os.environ.get('LOG_TO_FILE', 'False') == 'True'
+
+_log_handlers = ['console']
+if LOG_TO_FILE:
+    _log_handlers.append('file')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -279,32 +301,37 @@ LOGGING = {
         },
     },
     'handlers': {
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'django.log'),
-            'formatter': 'verbose',
-        },
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
     },
     'root': {
-        'handlers': ['file', 'console'],
+        'handlers': ['console'],
         'level': 'WARNING',
     },
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'WARNING',
             'propagate': False,
         },
         'core': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
     },
 }
+
+if LOG_TO_FILE:
+    LOGGING['handlers']['file'] = {
+        'class': 'logging.FileHandler',
+        'filename': os.path.join(BASE_DIR, 'django.log'),
+        'formatter': 'verbose',
+    }
+    for logger_name in ['root', 'django', 'core']:
+        target = LOGGING['root'] if logger_name == 'root' else LOGGING['loggers'][logger_name]
+        target['handlers'].append('file')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

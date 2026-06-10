@@ -1,0 +1,94 @@
+# =============================================================================
+# GAINTIME — docker-compose production
+# =============================================================================
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Les variables sensibles (SECRET_KEY, DB password, TELEGRAM_BOT_TOKEN…)
+# doivent être définies dans un fichier .env.prod ou passées à docker compose
+# via l'option --env-file.
+# =============================================================================
+
+services:
+  web:
+    ports: []
+    expose:
+      - "8000"
+    env_file:
+      - .env.prod
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-wends23}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-scam}
+      - REDIS_URL=redis://redis:6379/1
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - django_logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery_worker:
+    env_file:
+      - .env.prod
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-wends23}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-scam}
+      - REDIS_URL=redis://redis:6379/1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery_beat:
+    env_file:
+      - .env.prod
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-wends23}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-scam}
+      - REDIS_URL=redis://redis:6379/1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  bot:
+    env_file:
+      - .env.prod
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-wends23}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-scam}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+      - ./nginx/ssl/certbot/www:/var/www/certbot
+      - ./nginx/ssl/certbot/conf:/etc/letsencrypt
+      - ./nginx/ssl/logs:/var/log/nginx
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+  django_logs:

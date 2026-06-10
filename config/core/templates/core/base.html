@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#0F172A">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=GT&background=0F172A&color=fff&size=512&font-size=0.45&bold=true">
+    <link rel="apple-touch-icon" href="/static/core/img/icon-512.svg">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -19,6 +19,18 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
+        /* Help Tooltip */
+        .help-tip { position: relative; display: inline-flex; cursor: help; }
+        .help-tip .help-text {
+            visibility: hidden; opacity: 0; transition: 0.2s; pointer-events: none;
+            position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: #f8fafc; font-size: 10px; line-height: 1.4;
+            padding: 8px 12px; border-radius: 8px; white-space: nowrap; font-weight: 600; z-index: 100;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3); max-width: 260px; white-space: normal;
+        }
+        .help-tip .help-text::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #1e293b; }
+        .help-tip:hover .help-text { visibility: visible; opacity: 1; }
+
         :root {
             --bg-primary: #0F172A;
             --glass-bg: rgba(255, 255, 255, 0.05);
@@ -122,9 +134,16 @@
     <div class="htmx-indicator fixed top-4 left-1/2 -translate-x-1/2 z-[9999] gold-gradient text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg">
         <i class="fas fa-spinner fa-spin mr-2"></i> Chargement...
     </div>
+    {% if active_announcement %}
+    <div id="announcement-banner" class="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-purple-600 to-blue-600 text-white text-center py-2 px-4 text-[10px] font-bold flex items-center justify-center gap-2 cursor-pointer" onclick="{% if active_announcement.link %}window.open('{{ active_announcement.link }}','_blank'){% endif %}">
+        <i class="fas fa-bullhorn text-xs"></i>
+        <span>{{ active_announcement.message|truncatewords:15 }}</span>
+        <button onclick="event.stopPropagation();document.getElementById('announcement-banner').remove()" class="ml-2 text-white/70 hover:text-white"><i class="fas fa-times"></i></button>
+    </div>
+    {% endif %}
     {% if user.is_authenticated %}
     <!-- Modern Header -->
-    <header class="fixed top-4 left-4 right-4 z-50 glass-card p-3 flex justify-between items-center shadow-xl">
+    <header class="fixed top-4 left-4 right-4 z-50 glass-card p-3 flex justify-between items-center shadow-xl {% if active_announcement %}mt-10{% endif %}">
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 gold-gradient rounded-xl flex items-center justify-center text-white font-bold shadow-gold">GT</div>
             <div>
@@ -139,8 +158,7 @@
             </button>
             <a href="{% url 'notifications' %}" class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/10 transition relative">
                 <i class="fas fa-bell text-lg"></i>
-                <div id="notif-badge" hx-get="{% url 'unread_notifications_count' %}" hx-trigger="every 30s" hx-swap="innerHTML">
-                </div>
+                <div id="notif-badge">{% if user.is_authenticated and unread_count > 0 %}<span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">{{ unread_count }}</span>{% endif %}</div>
             </a>
             <a href="{% url 'vip_plans' %}" class="gold-gradient text-white text-[10px] font-black px-4 py-2.5 rounded-xl shadow-gold uppercase tracking-tight active:scale-95 transition">
                 Upgrade
@@ -205,6 +223,60 @@
     </nav>
     {% endif %}
 
+    <!-- Feedback Widget -->
+    {% if user.is_authenticated %}
+    <div class="fixed bottom-28 right-4 z-[999]">
+        <button onclick="document.getElementById('feedback-modal').classList.remove('hidden')" class="w-12 h-12 bg-purple-600 text-white rounded-full shadow-xl hover:bg-purple-700 transition active:scale-90 flex items-center justify-center" title="Feedback">
+            <i class="fas fa-message text-lg"></i>
+        </button>
+    </div>
+    <div id="feedback-modal" class="hidden fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-6 backdrop-blur-xl">
+        <div class="glass-card w-full max-w-sm p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black text-white">Suggestion / Problème</h3>
+                <button onclick="document.getElementById('feedback-modal').classList.add('hidden')" class="text-white/40 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form method="POST" action="{% url 'support' %}" class="space-y-3">
+                {% csrf_token %}
+                <input type="hidden" name="subject" value="Feedback utilisateur">
+                <textarea name="message" rows="4" required placeholder="Décrivez votre suggestion ou problème..." class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-muted/50 focus:outline-none focus:border-purple-500"></textarea>
+                <button type="submit" class="w-full bg-purple-600 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Envoyer</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Session Timeout Warning (25 min) -->
+    {% if user.is_authenticated %}
+    <div id="session-modal" class="hidden fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-6 backdrop-blur-xl">
+        <div class="glass-card p-8 text-center max-w-sm">
+            <div class="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
+                <i class="fas fa-clock text-3xl text-amber-500"></i>
+            </div>
+            <h3 class="text-xl font-black text-white mb-2">Session expirée</h3>
+            <p class="text-sm text-white/60 mb-6">Votre session va bientôt expirer. Souhaitez-vous continuer ?</p>
+            <div class="flex gap-3">
+                <button onclick="extendSession()" class="flex-1 gold-gradient text-white font-bold py-3 rounded-xl shadow-lg text-xs uppercase tracking-widest">Continuer</button>
+                <a href="{% url 'logout' %}" class="flex-1 bg-white/10 text-white font-bold py-3 rounded-xl border border-white/20 text-xs uppercase tracking-widest text-center">Déconnexion</a>
+            </div>
+        </div>
+    </div>
+    <script>
+        let sessionTimer;
+        function resetSessionTimer() {
+            clearTimeout(sessionTimer);
+            sessionTimer = setTimeout(() => document.getElementById('session-modal')?.classList.remove('hidden'), 25 * 60 * 1000);
+        }
+        function extendSession() {
+            document.getElementById('session-modal')?.classList.add('hidden');
+            fetch('/dashboard/', { method: 'HEAD' });
+            resetSessionTimer();
+        }
+        document.addEventListener('click', resetSessionTimer);
+        document.addEventListener('keydown', resetSessionTimer);
+        resetSessionTimer();
+    </script>
+    {% endif %}
     <script>
         function coinRain(count = 5) {
             const emojis = ['🪙', '💰', '✨', '⭐'];
@@ -227,17 +299,65 @@
         const themeIcon = document.getElementById('theme-icon');
         const body = document.body;
 
-        if (localStorage.getItem('theme') === 'light') {
-            body.classList.add('light-mode');
-            themeIcon?.classList.replace('fa-moon', 'fa-sun');
+        function applyTheme(theme) {
+            if (theme === 'light') {
+                body.classList.add('light-mode');
+                themeIcon?.classList.replace('fa-moon', 'fa-sun');
+            } else {
+                body.classList.remove('light-mode');
+                themeIcon?.classList.replace('fa-sun', 'fa-moon');
+            }
+            localStorage.setItem('theme', theme);
+            {% if user.is_authenticated %}
+            fetch('/api/theme/', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'theme=' + theme });
+            {% endif %}
+        }
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+            applyTheme('light');
         }
 
         themeToggle?.addEventListener('click', () => {
-            body.classList.toggle('light-mode');
-            const isLight = body.classList.contains('light-mode');
-            localStorage.setItem('theme', isLight ? 'light' : 'dark');
-            themeIcon.classList.replace(isLight ? 'fa-moon' : 'fa-sun', isLight ? 'fa-sun' : 'fa-moon');
+            const isLight = !body.classList.contains('light-mode');
+            applyTheme(isLight ? 'light' : 'dark');
         });
+        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                applyTheme(e.matches ? 'light' : 'dark');
+            }
+        });
+
+        // Real-time notifications via WebSocket
+        {% if user.is_authenticated %}
+        (function() {
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = proto + '//' + window.location.host + '/ws/notifications/';
+            let ws = new WebSocket(wsUrl);
+            let reconnectTimer;
+            function connectWs() {
+                ws = new WebSocket(wsUrl);
+                ws.onmessage = function(e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (data.type === 'count') {
+                            const badge = document.getElementById('notif-badge');
+                            if (badge) badge.innerHTML = data.count > 0 ? '<span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">' + data.count + '</span>' : '';
+                        }
+                    } catch(err) {}
+                };
+                ws.onclose = function() {
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = setTimeout(connectWs, 5000);
+                };
+            }
+            ws.onclose = function() {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = setTimeout(connectWs, 5000);
+            };
+        })();
+        {% endif %}
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

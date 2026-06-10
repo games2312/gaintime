@@ -2,31 +2,80 @@
 {% block title %}Programme Parrainage - GainTime{% endblock %}
 {% block content %}
 <div class="space-y-6 fade-in-up">
-    <h1 class="text-2xl font-bold">Programme Parrainage</h1>
-    <p class="text-muted text-sm">Vous avez <strong>{{ total_referrals }}</strong> filleul(s) — Niveau {{ current_tier }}</p>
+    <h1 class="text-2xl font-bold">Parrainage & Paliers</h1>
 
-    <div class="glass-card p-5 text-center">
-        <p class="text-3xl font-black gold-gradient text-transparent bg-clip-text">{{ total_referrals }}</p>
-        <p class="text-xs text-muted">filleuls directs</p>
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-3">
+        <div class="glass-card p-4 text-center">
+            <p class="text-2xl font-black gold-gradient text-transparent bg-clip-text">{{ total_referrals }}</p>
+            <p class="text-[10px] text-muted">Filleuls</p>
+        </div>
+        <div class="glass-card p-4 text-center">
+            <p class="text-2xl font-black text-green-400">{{ referral_earnings|floatformat:0 }} F</p>
+            <p class="text-[10px] text-muted">Gains parrainage</p>
+        </div>
+        <div class="glass-card p-4 text-center">
+            <p class="text-2xl font-black text-purple-400">Niv. {{ current_tier }}</p>
+            <p class="text-[10px] text-muted">Palier actuel</p>
+        </div>
     </div>
 
-    <h2 class="font-bold text-lg mt-6">Paliers</h2>
+    <!-- Paliers -->
+    <h2 class="font-bold text-lg mt-6">Paliers de parrainage</h2>
     <div class="space-y-3">
         {% for tier in tiers %}
-        <div class="glass-card p-4 {% if tier.level <= current_tier %}border border-yellow-500/30{% endif %}">
-            <div class="flex justify-between items-center">
-                <div>
-                    <span class="font-bold">Palier {{ tier.level }}</span>
-                    <p class="text-xs text-muted">{{ tier.needed }} filleuls — {{ tier.bonus }}</p>
+        <div class="glass-card p-4 border {% if tier.level <= current_tier %}border-yellow-500/30{% else %}border-white/10{% endif %}">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold">Palier {{ tier.level }}</span>
+                        {% if tier.level <= current_tier %}
+                        <span class="text-[9px] bg-green-500/20 text-green-400 font-bold px-2 py-0.5 rounded-full">DÉBLOQUÉ</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-muted mt-1">{{ tier.needed }} filleuls — {{ tier.bonus }}</p>
                 </div>
-                {% if tier.level <= current_tier %}
-                <span class="text-green-500 text-xs font-bold">DÉBLOQUÉ</span>
-                {% else %}
-                <span class="text-muted text-xs">{{ tier.needed }} filleuls requis</span>
-                {% endif %}
+                <div class="text-right">
+                    <p class="text-sm font-bold text-yellow-500">{{ tier.reward }} F</p>
+                    <p class="text-[9px] text-muted">prime de palier</p>
+                </div>
             </div>
+            {% if tier.level > current_tier %}
+            <div class="mt-3 bg-white/5 rounded-lg h-2 overflow-hidden">
+                <div class="bg-yellow-500 h-full rounded-lg" style="width: {% widthratio total_referrals tier.needed 100 %}%"></div>
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
+    </div>
+
+    <!-- Leaderboard -->
+    <h2 class="font-bold text-lg mt-8">Top Parrains</h2>
+    <div class="glass-card overflow-hidden">
+        {% if top_referrers %}
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-white/10 text-muted text-[10px] uppercase">
+                    <th class="text-left p-3">#</th>
+                    <th class="text-left p-3">Parrain</th>
+                    <th class="text-right p-3">Filleuls</th>
+                    <th class="text-right p-3 hidden sm:table-cell">Palier</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ref in top_referrers %}
+                <tr class="border-b border-white/5 {% if ref == user %}bg-yellow-500/10{% endif %}">
+                    <td class="p-3 font-bold">{{ forloop.counter }}</td>
+                    <td class="p-3">{{ ref.username }}{% if ref == user %} <span class="text-[9px] text-yellow-400">(vous)</span>{% endif %}</td>
+                    <td class="p-3 text-right font-bold">{{ ref.total_referrals }}</td>
+                    <td class="p-3 text-right text-muted hidden sm:table-cell">{{ ref.referral_tier }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-center text-muted py-8">Aucun parrain pour le moment. Soyez le premier !</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

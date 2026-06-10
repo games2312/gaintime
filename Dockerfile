@@ -16,7 +16,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY . .
 
-RUN mkdir -p /app/staticfiles /app/media
+RUN mkdir -p /app/staticfiles /app/media /app/logs && \
+    addgroup --system --gid 1000 app && \
+    adduser --system --uid 1000 --ingroup app app && \
+    chown -R app:app /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -26,6 +29,8 @@ EXPOSE 8000
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+USER app
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]

@@ -62,3 +62,28 @@ class ChatConsumer(JsonWebsocketConsumer):
             'username': event['username'],
             'timestamp': event['timestamp'],
         })
+
+class NotificationConsumer(JsonWebsocketConsumer):
+    def connect(self):
+        user = self.scope['user']
+        if not user.is_authenticated:
+            self.close()
+            return
+        self.user = user
+        self.group_name = f'notifications_user_{user.id}'
+        async_to_sync(self.channel_layer.group_add)(self.group_name, self.channel_name)
+        self.accept()
+        unread_count = Notification.objects.filter(user=user, is_read=False).count()
+        self.send_json({'type': 'count', 'count': unread_count})
+
+    def disconnect(self, close_code):
+        async_to_sync(self.channel_layer.group_discard)(self.group_name, self.channel_name)
+
+    def notify(self, event):
+        self.send_json({
+            'type': event['type'],
+            'count': event.get('count', 0),
+            'title': event.get('title', ''),
+            'message': event.get('message', ''),
+            'url': event.get('url', ''),
+        })

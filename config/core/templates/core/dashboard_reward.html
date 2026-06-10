@@ -59,6 +59,53 @@
         </div>
     </div>
 
+    <!-- Weekly Summary + XP -->
+    <div class="glass-card p-4 fade-in-up flex items-center justify-between" style="animation-delay: 0.05s;">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                <i class="fas fa-calendar-week"></i>
+            </div>
+            <div>
+                <p class="text-[10px] text-muted font-bold uppercase tracking-widest">{% trans "Cette semaine" %}</p>
+                <p class="text-lg font-black">{{ weekly_total|floatformat:0 }} <span class="text-sm text-muted">F</span></p>
+            </div>
+        </div>
+        <div class="text-right flex items-center gap-4">
+            <div>
+                <p class="text-[10px] text-muted font-bold">{% trans "Aujourd'hui" %}</p>
+                <p class="text-sm font-black text-green-400">{{ daily_earnings|floatformat:0 }} F</p>
+            </div>
+            <div class="w-px h-8 bg-white/10"></div>
+            <div class="text-center">
+                <p class="text-[10px] text-muted font-bold">NIVEAU</p>
+                <p class="text-lg font-black text-yellow-500">{{ user.level }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- XP Progress Card -->
+    <div class="glass-card p-4 fade-in-up" style="animation-delay: 0.07s;">
+        <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-star text-yellow-500 text-sm"></i>
+                <span class="text-sm font-bold">Niveau {{ user.level }}</span>
+            </div>
+            <span class="text-[11px] text-muted">{{ user.xp }} XP</span>
+        </div>
+        {% if next_level_xp %}
+        {% widthratio user.xp next_level_xp 100 as xp_pct %}
+        <div class="bg-white/10 rounded-xl h-3 overflow-hidden">
+            <div class="bg-gradient-to-r from-yellow-500 to-yellow-300 h-full rounded-xl transition-all duration-500" style="width: {{ xp_pct }}%"></div>
+        </div>
+        <p class="text-[10px] text-muted mt-1">{{ user.xp }} / {{ next_level_xp }} XP</p>
+        {% else %}
+        <div class="bg-white/10 rounded-xl h-3 overflow-hidden">
+            <div class="bg-gradient-to-r from-yellow-500 to-yellow-300 h-full rounded-xl" style="width: 100%"></div>
+        </div>
+        <p class="text-[10px] text-yellow-400 mt-1">Niveau maximum atteint !</p>
+        {% endif %}
+    </div>
+
     <!-- Quick Actions Grid -->
     <div class="grid grid-cols-4 gap-3 fade-in-up" style="animation-delay: 0.1s;">
         <a href="{% url 'deposit' %}" class="glass-card p-3 text-center active:scale-95 transition group">
@@ -165,16 +212,17 @@
             <p id="onboarding-text" class="text-white/70 text-sm leading-relaxed mb-10 font-medium">
                 {% trans "Prêt à faire du profit ? Suivez ce guide rapide pour bien débuter." %}
             </p>
-            <div class="flex justify-between items-center">
-                <div class="flex space-x-1.5">
-                    <div id="dot-1" class="w-2 h-2 rounded-full bg-primary-gold"></div>
-                    <div id="dot-2" class="w-2 h-2 rounded-full bg-white/20"></div>
-                    <div id="dot-3" class="w-2 h-2 rounded-full bg-white/20"></div>
+                <div class="flex justify-between items-center">
+                    <button onclick="skipOnboarding()" class="text-white/40 hover:text-white/70 text-[10px] font-bold uppercase tracking-widest transition">Passer</button>
+                    <div class="flex space-x-1.5">
+                        <div id="dot-1" class="w-2 h-2 rounded-full bg-primary-gold"></div>
+                        <div id="dot-2" class="w-2 h-2 rounded-full bg-white/20"></div>
+                        <div id="dot-3" class="w-2 h-2 rounded-full bg-white/20"></div>
+                    </div>
+                    <button id="onboarding-next" onclick="nextStep()" class="bg-white force-white-btn text-purple-900 px-8 py-3 rounded-xl font-black shadow-xl active:scale-95 transition-all uppercase text-xs tracking-widest">
+                        {% trans "Suivant" %}
+                    </button>
                 </div>
-                <button id="onboarding-next" onclick="nextStep()" class="bg-white force-white-btn text-purple-900 px-8 py-3 rounded-xl font-black shadow-xl active:scale-95 transition-all uppercase text-xs tracking-widest">
-                    {% trans "Suivant" %}
-                </button>
-            </div>
         </div>
     </div>
 </div>
@@ -270,6 +318,7 @@
         fetch("{% url 'finish_onboarding' %}", { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
         .then(() => document.getElementById('onboarding-overlay').classList.add('hidden'));
     }
+    function skipOnboarding() { finish(); }
     {% endif %}
 </script>
 {% endblock %}
