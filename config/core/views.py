@@ -1446,14 +1446,10 @@ def admin_reply_ticket(request, ticket_id):
             
     return redirect('admin_support')
 
-import io
-import qrcode
-from django.http import HttpResponse
-from django.urls import reverse
-
 def qr_code_view(request, code):
-    qr = qrcode.make(f"{request.scheme}://{request.get_host()}{reverse('register')}?ref={code}")
-    buf = io.BytesIO()
+    import qrcode
+    from io import BytesIO
+    buf = BytesIO()
     qr.save(buf, format='PNG')
     buf.seek(0)
     return HttpResponse(buf.getvalue(), content_type='image/png')
