@@ -27,6 +27,11 @@ if [ ! -f ".env.prod" ]; then
     exit 1
 fi
 
+# 2. Créer un .env minimal pour docker-compose (évite les warnings)
+# docker-compose.yml référence .env et POSTGRES_PASSWORD
+export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(grep -oP '^POSTGRES_PASSWORD=\K.*' .env.prod 2>/dev/null || echo 'changeme')}"
+[ -f ".env" ] || touch .env
+
 # 2. Vérifier que les certificats SSL existent
 if [ ! -d "nginx/ssl/certbot/conf/live" ]; then
     echo "ATTENTION : Certificats SSL introuvables."
