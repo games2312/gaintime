@@ -1,5 +1,5 @@
 # Dev / CI tools
 ruff==0.11.0
-coverage==7.6.0
+coverage==7.14.1
 model-bakery==1.19.0
 pre-commit==4.2.0
